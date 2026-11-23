@@ -1,0 +1,28 @@
+export const palette = {
+  grass: '#83ad65',
+  grassEdge: '#58794b',
+  soil: '#9e704b',
+  tilled: '#684631',
+  furrow: '#4e3328',
+  wheat: '#efbd4c',
+  carrot: '#ed842f',
+  tomato: '#dc5143',
+  leaf: '#467c45',
+  youngLeaf: '#85b35b',
+  trunk: '#77523c',
+  wood: '#d7b380',
+  roof: '#bd6453',
+  wall: '#fff0cf',
+  stone: '#aaa99b',
+  water: '#7bb8ba',
+  valid: '#d1ee91',
+  invalid: '#f29d8b',
+  selection: '#fff4c4',
+  sparkle: '#fff2a2',
+  sky: {
+    dawn: '#e9c5ac',
+    day: '#bcd8d5',
+    dusk: '#c4a5a3',
+    night: '#657d92'
+  }
+} as const;
