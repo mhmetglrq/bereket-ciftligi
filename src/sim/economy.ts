@@ -1,5 +1,6 @@
-import { CROPS, EXPANSION_COST } from './data';
+import { CROPS, EGG_PRICE, EXPANSION_COST } from './data';
 import { expandedCells } from './grid';
+import { isUnlocked } from './xp';
 import type { CropId, GameState, Result } from './types';
 
 export function sell(state: GameState, cropId: CropId, amount: number | 'all'): Result {
@@ -19,7 +20,21 @@ export function sell(state: GameState, cropId: CropId, amount: number | 'all'): 
   };
 }
 
+export function sellEgg(state: GameState, amount: number | 'all'): Result {
+  const count = amount === 'all' ? state.eggs : amount;
+  if (!Number.isSafeInteger(count) || count < 1) {
+    return { ok: false, reason: count === 0 ? 'noEggs' : 'invalidAmount' };
+  }
+  if (state.eggs < count) return { ok: false, reason: 'noEggs' };
+  return {
+    ok: true,
+    state: { ...state, gold: state.gold + count * EGG_PRICE, eggs: state.eggs - count },
+    events: [{ type: 'sell', amount: count }]
+  };
+}
+
 export function buySeed(state: GameState, cropId: CropId, amount: number): Result {
+  if (!isUnlocked(cropId, state.xp)) return { ok: false, reason: 'locked' };
   if (amount !== 1 && amount !== 5) return { ok: false, reason: 'invalidAmount' };
   const cost = CROPS[cropId].seedCost * amount;
   if (state.gold < cost) return { ok: false, reason: 'notEnoughGold' };

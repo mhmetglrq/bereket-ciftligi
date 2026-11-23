@@ -8,6 +8,7 @@ import { Hud } from './ui/Hud';
 import { Toolbar } from './ui/Toolbar';
 import { CellInfo } from './ui/CellInfo';
 import { Market } from './ui/Market';
+import { CoopPanel } from './ui/CoopPanel';
 import { Quests } from './ui/Quests';
 import { Settings, ResetConfirmation } from './ui/Settings';
 import { AwaySummary } from './ui/AwaySummary';
@@ -36,6 +37,27 @@ export default function App() {
     return () => {
       disposed = true;
       cleanups.forEach(cleanup => cleanup());
+    };
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const change = (event: MediaQueryListEvent): void =>
+      useGame.setState({ reducedMotion: event.matches });
+    const pause = (): void => {
+      const state = useGame.getState();
+      if (state.phase === 'playing' && !state.panel && !state.away) state.setPanel('pause');
+    };
+    const visibility = (): void => {
+      if (document.visibilityState === 'hidden') pause();
+    };
+    query.addEventListener('change', change);
+    window.addEventListener('blur', pause);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      query.removeEventListener('change', change);
+      window.removeEventListener('blur', pause);
+      document.removeEventListener('visibilitychange', visibility);
     };
   }, []);
 
@@ -68,6 +90,7 @@ export default function App() {
         ) : panel ? (
           <Modal key={panel} title={title} onClose={close}>
             {panel === 'market' && <Market />}
+            {panel === 'coop' && <CoopPanel />}
             {panel === 'quests' && <Quests />}
             {panel === 'settings' && <Settings />}
             {panel === 'reset' && <ResetConfirmation />}

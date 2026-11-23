@@ -11,8 +11,10 @@ export function Toolbar() {
       {tool === 'plant' && <div className="panel seed-panel"><SeedPicker /></div>}
       <div className="toolbar panel">
         <div role="group" aria-label={tr.toolbar} className="tools">
-          {(['till', 'plant', 'harvest'] as Tool[]).map((item, index) => (
-            <button key={item} aria-pressed={tool === item} onClick={() => choose(item)}>
+          {(['till', 'plant', 'harvest', 'water'] as Tool[]).map((item, index) => (
+            <button key={item} aria-pressed={tool === item}
+              title={item === 'water' ? tr.waterHint : tr.tools[item]}
+              onClick={() => choose(item)}>
               <span className="tool-icon" aria-hidden="true">{tr.toolIcons[item]}</span>
               <span>{tr.tools[item]}</span>
               <kbd aria-hidden="true">{index + 1}</kbd>
@@ -23,7 +25,7 @@ export function Toolbar() {
           ▦ <span>{tr.fieldList}</span>
         </button>
       </div>
-      <p className="control-hint">{tr.controlHint}</p>
+      <p className="control-hint" title={tr.keyHint}>{tr.controlHint}</p>
     </footer>
   );
 }

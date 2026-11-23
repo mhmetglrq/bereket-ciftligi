@@ -1,10 +1,14 @@
-import { isRipe } from './crops';
-import { buyExpansion, buySeed, sell } from './economy';
+import { isRipe, isWatered, waterOverlap } from './crops';
+import { CROPS } from './data';
+import { buyExpansion, buySeed, sell, sellEgg } from './economy';
+import { buyChicken, buyCoop, collectEgg, feed, feedAll, settleCoop } from './coop';
 import { applyQuestEvents, claimQuest } from './quests';
 import { rescue } from './rescue';
+import { isUnlocked, xpFor } from './xp';
+import { advanceOffline } from './offline';
 import type { Action, Cell, CropId, GameState, Result, Tool } from './types';
 
-export { buyExpansion, buySeed, sell, claimQuest };
+export { buyExpansion, buySeed, sell, sellEgg, claimQuest };
 
 function replace(state: GameState, cell: Cell): GameState {
   return { ...state, cells: state.cells.map(item => item.id === cell.id ? cell : item) };
@@ -21,12 +25,8 @@ export function till(state: GameState, cellId: string): Result {
   };
 }
 
-export function plant(
-  state: GameState,
-  cellId: string,
-  cropId: CropId,
-  now: number
-): Result {
+export function plant(state: GameState, cellId: string, cropId: CropId, now: number): Result {
+  if (!isUnlocked(cropId, state.xp)) return { ok: false, reason: 'locked' };
   const cell = state.cells.find(item => item.id === cellId);
   if (!cell) return { ok: false, reason: 'missingCell' };
   if (cell.kind === 'untilled') return { ok: false, reason: 'needTill' };
@@ -57,38 +57,63 @@ export function harvest(state: GameState, cellId: string, now: number): Result {
   };
 }
 
+export function water(state: GameState, cellId: string, now: number): Result {
+  const cell = state.cells.find(item => item.id === cellId);
+  if (!cell || cell.kind !== 'planted' || isRipe(cell, now) || isWatered(cell, now)) {
+    return { ok: false, reason: 'notApplicable' };
+  }
+  // Fold the previous, expired bonus into the planting timestamp exactly once.
+  if (cell.water && now < cell.water.at) return { ok: false, reason: 'notApplicable' };
+  const plantedAt = cell.plantedAt - (cell.water ? waterOverlap(cell.water, now) * 0.5 : 0);
+  return {
+    ok: true,
+    state: replace(state, {
+      ...cell,
+      plantedAt,
+      water: { at: now, until: now + CROPS[cell.cropId].growMs / 4 / 1.5 }
+    }),
+    events: [{ type: 'water', cropId: cell.cropId, amount: 1 }]
+  };
+}
+
 export function applyAction(state: GameState, action: Action, now: number): Result {
+  state = now < state.savedAt ? advanceOffline(state, now).state : settleCoop(state, now);
   let result: Result;
   switch (action.type) {
     case 'till': result = till(state, action.cellId); break;
     case 'plant': result = plant(state, action.cellId, action.cropId, now); break;
     case 'harvest': result = harvest(state, action.cellId, now); break;
+    case 'water': result = water(state, action.cellId, now); break;
     case 'sell': result = sell(state, action.cropId, action.amount); break;
+    case 'sellEgg': result = sellEgg(state, action.amount); break;
     case 'buySeed': result = buySeed(state, action.cropId, action.amount); break;
     case 'expand': result = buyExpansion(state); break;
     case 'claim': result = claimQuest(state, action.questId); break;
+    case 'buyCoop': result = buyCoop(state); break;
+    case 'buyChicken': result = buyChicken(state); break;
+    case 'feed': result = feed(state, action.chickenId, now); break;
+    case 'feedAll': result = feedAll(state, now); break;
+    case 'collectEgg': result = collectEgg(state, now); break;
   }
   if (!result.ok) return result;
-  const checked = rescue(applyQuestEvents(result.state, result.events));
+  const checked = rescue(applyQuestEvents({
+    ...result.state,
+    xp: result.state.xp + xpFor(result.events)
+  }, result.events));
   return {
     ok: true,
     state: { ...checked.state, savedAt: now },
-    events: checked.gifted
-      ? [...result.events, { type: 'rescue', amount: 5 }]
-      : result.events
+    events: checked.gifted ? [...result.events, { type: 'rescue', amount: 5 }] : result.events
   };
 }
 
 export function canApply(
-  tool: Tool,
-  cell: Cell,
-  state: GameState,
-  now: number,
-  cropId: CropId = 'wheat'
+  tool: Tool, cell: Cell, state: GameState, now: number, cropId: CropId = 'wheat'
 ): boolean {
   switch (tool) {
     case 'till': return till(state, cell.id).ok;
     case 'plant': return plant(state, cell.id, cropId, now).ok;
     case 'harvest': return harvest(state, cell.id, now).ok;
+    case 'water': return water(state, cell.id, now).ok;
   }
 }

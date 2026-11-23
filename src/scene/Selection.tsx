@@ -10,6 +10,8 @@ export function Selection() {
   const tool = useGame(state => state.tool);
   const seed = useGame(state => state.seed);
   const now = useGame(state => state.now);
+  const panel = useGame(state => state.panel);
+  const away = useGame(state => state.away);
   const cell = game.cells.find(item => item.id === selected);
   if (!cell) return null;
   const valid = !tool || canApply(tool, cell, game, now, seed);
@@ -19,14 +21,13 @@ export function Selection() {
         <ringGeometry args={[0.40, 0.48, 4, 1, Math.PI / 4]} />
         <meshBasicMaterial
           color={!tool ? palette.selection : valid ? palette.valid : palette.invalid}
-          depthWrite={false}
-        />
+          depthWrite={false} />
       </mesh>
-      <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
-        <span className={`selection-label ${valid ? '' : 'invalid'}`}>
-          {tool ? valid ? tr.valid : tr.invalid : tr.cell}
-        </span>
-      </Html>
+      {valid && !panel && !away && (
+        <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
+          <span className="selection-label">{tool ? tr.valid : tr.cell}</span>
+        </Html>
+      )}
     </group>
   );
 }
