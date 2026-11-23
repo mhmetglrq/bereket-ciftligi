@@ -41,8 +41,14 @@ export function EditLayer() {
       if (pointer !== null || e.button !== 0) return;
       const p = point(e); if (!p) return;
       const s = useGame.getState();
-      let object: LayoutObject | undefined, closest = Infinity;
-      for (const candidate of s.game.layout) {
+      // The footprint under the pointer wins: a tall neighbour's bounding box
+      // (a tree behind the shipping box) used to steal the grab.
+      let object: LayoutObject | undefined = s.game.layout.find(c =>
+        p.x >= c.x - 0.5 && p.x < c.x + c.width - 0.5 && p.y >= c.y - 0.5 && p.y < c.y + c.height - 0.5 && !c.id.startsWith('plot-'))
+        ?? s.game.layout.find(c =>
+          p.x >= c.x - 0.5 && p.x < c.x + c.width - 0.5 && p.y >= c.y - 0.5 && p.y < c.y + c.height - 0.5);
+      let closest = object ? -1 : Infinity;
+      for (const candidate of object ? [] : s.game.layout) {
         box.min.set(candidate.x - 0.5, 0, candidate.y - 0.5);
         box.max.set(candidate.x + candidate.width - 0.5, candidate.id.startsWith('plot-') ? 0.15 : candidate.id === 'shipping' ? 0.8 : 2.5, candidate.y + candidate.height - 0.5);
         if (ray.ray.intersectBox(box, objectHit)) {
