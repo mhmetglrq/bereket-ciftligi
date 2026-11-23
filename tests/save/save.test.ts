@@ -35,7 +35,7 @@ describe('schema and serialization', () => {
   it('does not invent migrations for unknown or unversioned schemas', () => {
     expect(migrate({ version: 0 }).kind).toBe('corrupt');
     expect(migrate({}).kind).toBe('corrupt');
-    expect(migrate({ version: 4 }).kind).toBe('future');
+    expect(migrate({ version: 5 }).kind).toBe('future');
   });
 });
 
@@ -51,13 +51,13 @@ describe('save recovery and storage selection', () => {
       expect(await local.get(`${SAVE_KEY}:corrupt:${NOW}`)).toBe(raw);
     });
   }
-  it('preserves a future save and marks the session read-only', async () => {
+  it('preserves a future save and backs up unknown versions', async () => {
     const local = memoryBackend();
     const raw = '{"version":42,"futureData":true}';
     await local.set(SAVE_KEY, raw);
     const result = await loadGame(new SaveStorage([local, memoryBackend(), memoryBackend()]), NOW);
-    expect(result.readonly).toBe(true);
-    expect(result.notice).toBe('future');
+    expect(result.readonly).toBe(false);
+    expect(result.notice).toBe('corrupt');
     expect(await local.get(SAVE_KEY)).toBe(raw);
   });
   it('never reads the second backend after a successful null', async () => {

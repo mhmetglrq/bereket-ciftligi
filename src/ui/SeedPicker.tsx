@@ -3,9 +3,11 @@ import { isUnlocked } from '../sim/xp';
 import { useGame } from '../store/game';
 import { tr } from '../i18n/tr';
 import { number } from '../i18n/format';
+import { inSeason } from '../sim/seasons';
 
 export function SeedPicker() {
   const seed = useGame(state => state.seed);
+  const season = useGame(state => state.game.season);
   const seeds = useGame(state => state.game.seeds);
   const xp = useGame(state => state.game.xp);
   const unlocks = useGame(state => [...state.toasts].reverse().find(item => item.kind === 'level')?.unlocks);
@@ -14,7 +16,7 @@ export function SeedPicker() {
     <div className="seed-picker">
       <span className="small-label">{tr.seedChoice}</span>
       <div className="seed-options" role="group" aria-label={tr.seedChoice}>
-        {CROP_IDS.map(id => {
+        {CROP_IDS.filter(id => inSeason(id, season)).map(id => {
           const locked = !isUnlocked(id, xp);
           return (
             <button key={id} aria-pressed={seed === id}

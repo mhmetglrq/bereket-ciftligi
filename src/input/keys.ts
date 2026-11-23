@@ -6,8 +6,9 @@ export function bindKeys(): () => void {
     if (target instanceof HTMLElement &&
       (target.matches('input, textarea, select') || target.isContentEditable)) return;
     const state = useGame.getState();
-    if (state.panel || state.away || state.phase !== 'playing') return;
-    if (event.key === 'Escape') useGame.setState({ tool: null, selected: null });
+    if (state.panel || state.modalQueue.length || state.phase !== 'playing') return;
+    if (state.editMode) { if (event.key === 'Escape') state.cancelEdit(); return; }
+    if (event.key === 'Escape') { state.setPanel('pause'); return; }
     if (event.key.toLowerCase() === 'p') {
       event.preventDefault();
       state.setPanel('pause');

@@ -1,4 +1,4 @@
-import { CHICKEN_COST, EGG_MS, MAX_CHICKENS } from '../sim/data';
+import { CHICKEN_COST, MAX_CHICKENS } from '../sim/data';
 import { useGame } from '../store/game';
 import { tr } from '../i18n/tr';
 import { number } from '../i18n/format';
@@ -7,7 +7,6 @@ export function CoopPanel() {
   const coop = useGame(state => state.game.coop);
   const wheat = useGame(state => state.game.produce.wheat);
   const gold = useGame(state => state.game.gold);
-  const now = useGame(state => state.now);
   const readonly = useGame(state => state.readonly || state.conflict);
   const dispatch = useGame(state => state.dispatch);
   const hungry = coop.chickens.filter(chicken => chicken.fedAt === null).length;
@@ -33,8 +32,6 @@ export function CoopPanel() {
           <div className="chicken-slots">
             {Array.from({ length: MAX_CHICKENS }, (_, index) => {
               const chicken = coop.chickens[index];
-              const elapsed = chicken?.fedAt === null || !chicken ? 0 :
-                Math.max(0, Math.min(EGG_MS, now - chicken.fedAt));
               return (
                 <article className="chicken-slot" key={chicken?.id ?? `empty-${index}`}>
                   <span className="chicken-art" aria-hidden="true">{chicken ? '🐔' : '＋'}</span>
@@ -57,15 +54,7 @@ export function CoopPanel() {
                     </>
                   ) : (
                     <>
-                      <span className="chicken-timer" role="progressbar"
-                        aria-label={tr.laying} aria-valuemin={0} aria-valuemax={60}
-                        aria-valuenow={Math.floor(elapsed / 1000)}
-                        style={{ background: `conic-gradient(var(--green) ${elapsed / EGG_MS * 360}deg, var(--xp-track) 0deg)` }}>
-                        <span>🥚</span>
-                      </span>
-                      <span className="status-chip">
-                        {tr.laying} · {number(Math.ceil((EGG_MS - elapsed) / 1000))} {tr.seconds}
-                      </span>
+                      <span className="status-chip">Beslendi · Yumurta sabah hazır olacak</span>
                     </>
                   )}
                 </article>

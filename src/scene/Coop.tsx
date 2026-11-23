@@ -4,24 +4,26 @@ import { useGame } from '../store/game';
 import { tr } from '../i18n/tr';
 import { number } from '../i18n/format';
 import { palette } from './palette';
+import { objectCenter } from '../sim/layout';
 
 export function Coop() {
   const coop = useGame(state => state.game.coop);
   const size = useGame(state => state.game.gridSize);
+  const layout = useGame(state => state.game.layout);
   const [hovered, setHovered] = useState(false);
   if (!coop.owned) return null;
   const hungry = coop.chickens.some(chicken => chicken.fedAt === null);
   const open = (): void => {
     const state = useGame.getState();
-    if (state.phase === 'playing' && !state.panel && !state.away && !state.conflict) {
+    if (state.phase === 'playing' && !state.editMode && !state.modalQueue.length && !state.panel && !state.conflict) {
       state.setPanel('coop');
     }
   };
   return (
-    <group position={[size + 0.65, 0, (size - 1) / 2]}
+    <group position={objectCenter(layout, 'coop')}
       onClick={event => { event.stopPropagation(); open(); }}
-      onPointerOver={event => { event.stopPropagation(); setHovered(true); }}
-      onPointerOut={() => setHovered(false)}>
+      onPointerOver={event => { event.stopPropagation(); setHovered(true); useGame.setState({ hoveredObject: 'coop' }); }}
+      onPointerOut={() => { setHovered(false); useGame.setState({ hoveredObject: null }); }}>
       <mesh position={[0, 0.65, 0]} receiveShadow castShadow>
         <boxGeometry args={[1.55, 1.2, 1.45]} />
         <meshStandardMaterial color={palette.wall} flatShading roughness={1} />
@@ -56,13 +58,6 @@ export function Coop() {
           <meshBasicMaterial color={palette.selection} />
         </mesh>
       )}
-      <Html position={[0, 2.05, 0]} center>
-        <button className="coop-scene-button" onClick={open} aria-label={tr.coop}>
-          <span>{tr.coop}</span>
-          {coop.pendingEggs > 0 && <span className="coop-badge egg-badge">🥚 {number(coop.pendingEggs)}</span>}
-          {hungry && <span className="coop-badge hungry-badge" title={tr.hungry}>🍽</span>}
-        </button>
-      </Html>
     </group>
   );
 }

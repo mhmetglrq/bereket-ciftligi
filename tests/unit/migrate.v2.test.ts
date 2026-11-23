@@ -5,7 +5,7 @@ import { emptyInventory, QUESTS } from '../../src/sim/data';
 import type { LegacyGameState } from '../../src/save/schema';
 import type { GameState } from '../../src/sim/types';
 
-describe('Migration v1 -> v3', () => {
+describe('Migration v1 -> v4', () => {
   const now = 1_700_000_000_000;
 
   const validLegacyCells: LegacyGameState['cells'] = Array.from({ length: 36 }, (_, i) => ({
@@ -52,14 +52,16 @@ describe('Migration v1 -> v3', () => {
 
     // Checks v2 schema validity
     expect(isGameState(state)).toBe(true);
-    expect(state.version).toBe(3);
+    expect(state.version).toBe(4);
 
     // Retains player progress
     expect(state.gold).toBe(150);
     expect(state.createdAt).toBe(legacyFixture.createdAt);
     expect(state.savedAt).toBe(legacyFixture.savedAt);
     expect(state.gridSize).toBe(6);
-    expect(state.cells).toEqual(legacyFixture.cells);
+    expect(state.cells.map(c => c.id)).toEqual(legacyFixture.cells.map(c => c.id));
+    expect(state.cells[0].daysRemaining).toBe(4);
+    expect(state.minute).toBe(360);
 
     // Inventories kept and expanded with new crops defaulting to 0
     expect(state.seeds).toEqual({
@@ -111,7 +113,7 @@ describe('Migration v1 -> v3', () => {
   });
 
   it('rejects future versions with kind future', () => {
-    const futureSave = { ...legacyFixture, version: 4 };
+    const futureSave = { ...legacyFixture, version: 5 };
     const result = migrate(futureSave);
     expect(result.kind).toBe('future');
   });

@@ -6,9 +6,11 @@ import { useGame } from '../store/game';
 import type { Assets } from './assets';
 import type { BuildingId } from '../sim/types';
 import { tr } from '../i18n/tr';
+import { objectCenter } from '../sim/layout';
 
 function BuildingModel({ id, assets }: { id: BuildingId; assets: Assets }) {
   const building = useGame(s => s.game.buildings[id]);
+  const layout = useGame(s => s.game.layout);
   const sails = useRef<Group>(null), marker = useRef<Group>(null);
   useFrame(({ clock }, delta) => {
     const state = useGame.getState();
@@ -19,12 +21,12 @@ function BuildingModel({ id, assets }: { id: BuildingId; assets: Assets }) {
   });
   const open = (): void => {
     const s = useGame.getState();
-    if (s.phase === 'playing' && !s.panel && !s.away && !s.conflict) s.setPanel(building.owned ? id : 'market');
+    if (s.phase === 'playing' && !s.editMode && !s.modalQueue.length && !s.panel && !s.conflict) { useGame.setState({ selectedObject: id }); s.setPanel(building.owned ? id : 'market'); }
   };
   const wood = assets.get('building.wood'), stone = assets.get('building.stone'), roof = assets.get('building.roof'), wall = assets.get('building.wall'), dark = assets.get('building.dark'), window = assets.get('building.window'), gold = assets.get('building.marker');
   const ready = Object.values(building.readyOutput).some(q => q > 0);
   const proxy = assets.get('building.proxy');
-  return <group position={[id === 'mill' ? 0.7 : 3.2, 0, -1.85]} dispose={null}>
+  return <group position={objectCenter(layout, id)} dispose={null} onPointerOver={() => useGame.setState({ hoveredObject: id })} onPointerOut={() => useGame.setState({ hoveredObject: null })}>
     <mesh geometry={wood.geometry} material={wood.material} position={[0, 0.1, 0]} scale={[1.9, 0.18, 1.55]} />
     {[-0.6, 0, 0.6].map(x => <mesh key={x} geometry={dark.geometry} material={dark.material} position={[x, 0.2, 0]} scale={[0.025, 0.02, 1.55]} />)}
     {building.owned ? id === 'mill' ? <>
@@ -45,7 +47,6 @@ function BuildingModel({ id, assets }: { id: BuildingId; assets: Assets }) {
     </>}
     <mesh geometry={proxy.geometry} material={proxy.material} position={[0, 0.9, 0]} onClick={e => { e.stopPropagation(); open(); }} />
     {ready && <group ref={marker}><mesh geometry={gold.geometry} material={gold.material} position={[0, 2.55, 0]} /></group>}
-    <Html position={[0, building.owned ? 2.9 : 1.35, 0]} center><button className="coop-scene-button building-sign" onClick={open}>{building.owned ? tr[id] : tr.pads[id]}{ready && <b className="badge">{tr.outputReady}</b>}</button></Html>
   </group>;
 }
 export function Buildings({ assets }: { assets: Assets }) {

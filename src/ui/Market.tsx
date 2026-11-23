@@ -1,10 +1,10 @@
-import { CROP_IDS, CROPS, COOP_COST, EGG_PRICE, EXPANSION_COST, BUILDINGS, TREES, GOODS } from '../sim/data';
+import { CROP_IDS, CROPS, COOP_COST, EXPANSION_COST, BUILDINGS, TREES } from '../sim/data';
 import { isUnlocked, levelOf } from '../sim/xp';
-import { getStock } from '../sim/inventory';
-import type { GoodId } from '../sim/types';
+import { inSeason } from '../sim/seasons';
+import { FOOD } from '../sim/energy';
 import { useGame } from '../store/game';
 import { tr } from '../i18n/tr';
-import { duration, number } from '../i18n/format';
+import { number } from '../i18n/format';
 
 export function Market() {
   const game = useGame(state => state.game);
@@ -12,7 +12,6 @@ export function Market() {
   const readonly = useGame(state => state.readonly || state.conflict);
   const selected = useGame(state => state.selected);
   const cell = game.cells.find(c => c.id === selected);
-  const empty = CROP_IDS.every(id => game.produce[id] === 0) && game.eggs === 0;
   return (
     <div className="market-content">
       {readonly && <p className="empty">{tr.readonly}</p>}
@@ -25,18 +24,18 @@ export function Market() {
         <button disabled={readonly || !cell || (cell.kind !== 'tilled' && cell.kind !== 'untilled') || game.gold < TREES[id].cost || levelOf(game.xp) < TREES[id].level} onClick={() => { if (cell) dispatch({ type: 'plantTree', treeId: id, cellId: cell.id }); }}>{tr.plantTree}</button>
         {(!cell || cell.kind === 'tree' || cell.kind === 'planted') && <small>{tr.selectEmpty}</small>}
       </article>)}</div></section>
-      <section><h3>{tr.goodsTitle}</h3>{(Object.keys(GOODS) as GoodId[]).map(id => <div className="inventory-row" key={id}><span>{tr.items[id]} × {number(getStock(game, id))} · {number(GOODS[id])} ◉</span><div className="button-row"><button disabled={readonly || !getStock(game, id)} onClick={() => dispatch({ type: 'sellItem', itemId: id, amount: 1 })}>{tr.sellOne}</button><button disabled={readonly || !getStock(game, id)} onClick={() => dispatch({ type: 'sellItem', itemId: id, amount: 'all' })}>{tr.sellAll}</button></div></div>)}</section>
+      <section><h3>Enerji veren yiyecekler</h3><div className="recipe-grid">{(['bread', 'cake'] as const).map(id => <article className="feature-card" key={id}><h4>{tr.items[id]}</h4><p>+{FOOD[id].energy} enerji · {FOOD[id].cost} altın</p><p>Ambar: {game.goods[id]}</p><button disabled={readonly || game.gold < FOOD[id].cost} onClick={() => dispatch({ type: 'buyFood', itemId: id })}>Satın al</button><button disabled={readonly || !game.goods[id] || game.energy === 270} onClick={() => useGame.getState().eat(id)}>Ye</button></article>)}</div></section>
       <section>
-        <h3>{tr.buy}</h3>
+        <h3>{tr.buy}</h3>{game.season === 'winter' && <p className="empty">Kışın tarlaya ekin ekilmez</p>}
         <div className="crop-cards">
-          {CROP_IDS.map(id => {
+          {CROP_IDS.filter(id => inSeason(id, game.season)).map(id => {
             const locked = !isUnlocked(id, game.xp);
             return (
               <article className={`crop-card ${locked ? 'locked' : ''}`} key={id}>
                 {locked && <span className="locked-badge">🔒 {tr.level} {CROPS[id].level}</span>}
                 <span className={`crop-art ${id}`} aria-hidden="true">{CROPS[id].icon}</span>
                 <div className="crop-title"><h4>{tr.crops[id]}</h4><span>{tr.seeds}: {number(game.seeds[id])}</span></div>
-                <p className="muted">{tr.growTime}: {duration(CROPS[id].growMs)} · {tr.price}: {number(CROPS[id].salePrice)} ◉</p>
+                <p className="muted">{tr.growTime}: {CROPS[id].days} gün · {tr.price}: {number(CROPS[id].salePrice)} ◉</p>
                 <div className="button-row">
                   {([1, 5] as const).map(amount => (
                     <button key={amount}
@@ -71,33 +70,6 @@ export function Market() {
             {game.gold < COOP_COST && <small>{tr.noGold}</small>}
           </>
         )}
-      </section>
-      <section>
-        <h3>{tr.sell} <span className="muted">· {tr.inventory}</span></h3>
-        {empty && <p className="empty">{tr.emptyInventory}</p>}
-        {CROP_IDS.map(id => (
-          <div className="inventory-row" key={id}>
-            <span>{CROPS[id].icon} {tr.crops[id]} <b>× {number(game.produce[id])}</b></span>
-            <div className="button-row">
-              <button disabled={readonly || game.produce[id] === 0}
-                onClick={() => dispatch({ type: 'sell', cropId: id, amount: 1 })}>{tr.sellOne}</button>
-              <button disabled={readonly || game.produce[id] === 0}
-                onClick={() => dispatch({ type: 'sell', cropId: id, amount: 'all' })}>{tr.sellAll}</button>
-            </div>
-          </div>
-        ))}
-      </section>
-      <section>
-        <h3>{tr.eggTitle}</h3>
-        <div className="inventory-row">
-          <span>🥚 {number(game.eggs)} {tr.eggs} · {number(EGG_PRICE)} ◉</span>
-          <div className="button-row">
-            <button disabled={readonly || game.eggs === 0}
-              onClick={() => dispatch({ type: 'sellEgg', amount: 1 })}>{tr.sellOne}</button>
-            <button disabled={readonly || game.eggs === 0}
-              onClick={() => dispatch({ type: 'sellEgg', amount: 'all' })}>{tr.sellAll}</button>
-          </div>
-        </div>
       </section>
       <section className="expansion-card">
         <div><h3>{tr.expansion}</h3><p>{tr.expansionText}</p></div>

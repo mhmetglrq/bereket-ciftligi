@@ -12,8 +12,9 @@ vi.mock('../../src/audio/sfx', () => ({
 describe('store actions', () => {
   beforeEach(() => {
     useGame.setState({
-      game: newGame(1000), phase: 'playing', panel: null, away: null,
+      game: newGame(1000), phase: 'playing', panel: null,
       conflict: false, readonly: false, selected: null, tool: null,
+      editMode: false, modalQueue: [], layoutSnapshot: null,
       toasts: [], floaters: [], mayWrite: () => true, requestSave: vi.fn()
     });
   });
@@ -30,7 +31,7 @@ describe('store actions', () => {
 
   it('shows a short warning without changing the game', () => {
     const before = useGame.getState().game;
-    useGame.getState().dispatch({ type: 'plant', cellId: '0,0', cropId: 'wheat' });
+    useGame.getState().dispatch({ type: 'plant', cellId: '0,0', cropId: 'carrot' });
     expect(useGame.getState().game).toBe(before);
     expect(useGame.getState().toasts.at(-1)?.text).toBe(tr.reasons.needTill);
     expect(useGame.getState().requestSave).not.toHaveBeenCalled();

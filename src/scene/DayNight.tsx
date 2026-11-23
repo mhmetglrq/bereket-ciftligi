@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Color, DirectionalLight, HemisphereLight } from 'three';
-import { DAY_MS } from '../sim/data';
 import { useGame } from '../store/game';
 import { palette } from './palette';
 
@@ -16,7 +15,7 @@ export function DayNight() {
 
   useFrame(({ scene }, delta) => {
     const state = useGame.getState();
-    if (state.panel !== 'pause') phase.current = ((Date.now() - state.game.createdAt) % DAY_MS) / DAY_MS;
+    phase.current = (state.game.minute - 360) / 1440;
     const daylight = Math.max(0, Math.sin(phase.current * Math.PI * 2));
     const desired = day.clone().lerp(night, 1 - daylight);
     sky.current.lerp(desired, state.reducedMotion ? 1 : Math.min(1, delta * 0.5));

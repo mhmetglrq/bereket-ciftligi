@@ -3,8 +3,10 @@ import { InstancedMesh, Object3D, Shape } from 'three';
 import { isWatered } from '../sim/crops';
 import { useGame } from '../store/game';
 import { palette } from './palette';
+import { cellPosition } from '../sim/layout';
 
 export function WaterMarks() {
+  const layout = useGame(state => state.game.layout);
   const cells = useGame(state => state.game.cells);
   const now = useGame(state => state.now);
   const ref = useRef<InstancedMesh>(null);
@@ -22,7 +24,8 @@ export function WaterMarks() {
     let count = 0;
     cells.forEach(cell => {
       if (!isWatered(cell, now)) return;
-      object.position.set(cell.x + 0.32, 0.10, cell.y - 0.31);
+      const p = cellPosition(cell, layout);
+      object.position.set(p.x + 0.32, 0.10, p.y - 0.31);
       object.rotation.set(-Math.PI / 2, 0, 0);
       object.updateMatrix();
       ref.current?.setMatrixAt(count++, object.matrix);
@@ -30,7 +33,7 @@ export function WaterMarks() {
     ref.current.count = count;
     ref.current.instanceMatrix.needsUpdate = true;
     ref.current.computeBoundingSphere();
-  }, [cells, now]);
+  }, [cells, now, layout]);
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, 64]}>
       <shapeGeometry args={[shape, 8]} />

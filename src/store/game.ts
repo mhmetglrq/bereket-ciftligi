@@ -3,7 +3,8 @@ import { createGameSlice, type GameSlice } from './slices/gameSlice';
 import { createUISlice, type UISlice } from './slices/uiSlice';
 import { browserStorage, loadGame, type SaveStorage } from '../save/storage';
 import { createTabLock } from '../save/tabLock';
-import { advanceOffline } from '../sim/offline';
+import { overnightQueue } from './slices/uiSlice';
+import { localDateKey } from '../sim/daily';
 import { rescue } from '../sim/rescue';
 import { isRipe } from '../sim/crops';
 import { tr } from '../i18n/tr';
@@ -44,16 +45,15 @@ async function initialize(): Promise<void> {
   storage = browserStorage();
   const now = Date.now();
   const loaded = await loadGame(storage, now);
-  const offline = advanceOffline(loaded.state, now);
-  const checked = rescue(offline.state);
+  const checked = rescue(loaded.state);
   useGame.setState({
     game: checked.state,
-    now,
-    away: offline.summary,
+    now: checked.state.elapsedMinutes,
+    modalQueue: overnightQueue(null, { items: {}, total: 0 }, !checked.state.seenV4Intro, checked.state.daily.lastClaim !== localDateKey(now)),
     readonly: loaded.readonly,
     storageMode: storage.mode,
     phase: 'title',
-    ripeIds: checked.state.cells.filter(cell => isRipe(cell, now)).map(cell => cell.id)
+    ripeIds: checked.state.cells.filter(cell => isRipe(cell, checked.state.elapsedMinutes)).map(cell => cell.id)
   });
   if (loaded.notice) useGame.getState().notify(tr[loaded.notice]);
   if (checked.gifted) useGame.getState().notify(tr.gift);

@@ -1,4 +1,6 @@
 import { palette } from './palette';
+import { useGame } from '../store/game';
+import { objectCenter } from '../sim/layout';
 
 function Tree({ x, z, scale = 1 }: { x: number; z: number; scale?: number }) {
   return (
@@ -20,13 +22,15 @@ function Tree({ x, z, scale = 1 }: { x: number; z: number; scale?: number }) {
 }
 
 export function Decor() {
+  const layout = useGame(s => s.game.layout);
+  const open = (id: 'home' | 'shipping') => { const s = useGame.getState(); if (s.phase === 'playing' && !s.editMode && !s.modalQueue.length && !s.panel) s.setPanel(id); };
   return (
     <group>
       <Tree x={-1.1} z={-1.2} scale={1.25} />
       <Tree x={8.5} z={-1.3} scale={1.4} />
       <Tree x={9} z={8.4} />
       <Tree x={-1.2} z={8.6} scale={0.85} />
-      <group position={[4.3, 0, -2]}>
+      <group position={objectCenter(layout, 'home')} onClick={e => { e.stopPropagation(); open('home'); }} onPointerOver={() => useGame.setState({ hoveredObject: 'home' })} onPointerOut={() => useGame.setState({ hoveredObject: null })}>
         <mesh castShadow position={[0, 0.55, 0]}>
           <boxGeometry args={[1.8, 1.1, 1.35]} />
           <meshStandardMaterial color={palette.wall} flatShading />
@@ -44,6 +48,9 @@ export function Decor() {
           <meshStandardMaterial color={palette.water} flatShading />
         </mesh>
       </group>
+      <mesh position={objectCenter(layout, 'shipping').map((v, i) => i === 1 ? 0.4 : v) as [number, number, number]} onClick={e => { e.stopPropagation(); open('shipping'); }} onPointerOver={() => useGame.setState({ hoveredObject: 'shipping' })} onPointerOut={() => useGame.setState({ hoveredObject: null })}>
+        <boxGeometry args={[0.8, 0.8, 0.8]} /><meshStandardMaterial color={palette.wood} />
+      </mesh>
       {[-1, 0, 1, 2, 3, 4, 5, 6, 7, 8].map(x => (
         <group key={x} position={[x, 0, -0.9]}>
           <mesh castShadow position={[0, 0.23, 0]}>

@@ -54,12 +54,12 @@ function createV2Save(): Record<string, unknown> {
 }
 
 describe('migrate & save storage', () => {
-  it('migrates v1 and v2 saves to v3 preserving player progress', () => {
+  it('migrates v1 and v2 saves to v4 preserving player progress', () => {
     const v1 = createV1Save();
     const res1 = migrate(v1);
     expect(res1.kind).toBe('ok');
     if (res1.kind === 'ok') {
-      expect(res1.state.version).toBe(3);
+      expect(res1.state.version).toBe(4);
       expect(res1.state.gold).toBe(350);
       expect(res1.state.produce.wheat).toBe(10);
       expect(res1.state.buildings.mill.owned).toBe(false);
@@ -70,7 +70,7 @@ describe('migrate & save storage', () => {
     const res2 = migrate(v2);
     expect(res2.kind).toBe('ok');
     if (res2.kind === 'ok') {
-      expect(res2.state.version).toBe(3);
+      expect(res2.state.version).toBe(4);
       expect(res2.state.gold).toBe(450);
       expect(res2.state.xp).toBe(60);
       expect(res2.state.eggs).toBe(4);
@@ -92,14 +92,14 @@ describe('migrate & save storage', () => {
   });
 
   it('rejects future version and corrupt save', () => {
-    const future = { ...createV2Save(), version: 4 };
+    const future = { ...createV2Save(), version: 5 };
     expect(migrate(future).kind).toBe('future');
 
     const corrupt = { version: 3, broken: true };
     expect(migrate(corrupt).kind).toBe('corrupt');
   });
 
-  it('keeps backup until the first successful v3 save', async () => {
+  it('keeps backup until the first successful v4 save', async () => {
     const backend = memoryBackend();
     const storage = new SaveStorage([backend, memoryBackend(), memoryBackend()]);
 
@@ -107,10 +107,10 @@ describe('migrate & save storage', () => {
     await storage.protectLegacy(rawV2, 2);
 
     // Backup is created
-    expect(await backend.get('bereket-ciftligi:save:v1:backup:pre-v3')).toBe(rawV2);
+    expect(await backend.get('bereket-ciftligi:save:v1:backup:pre-v4')).toBe(rawV2);
 
-    // After migration finishes, pre-v3 backup is cleaned up
+    // The pre-migration backup remains available after migration.
     await storage.finishMigration();
-    expect(await backend.get('bereket-ciftligi:save:v1:backup:pre-v3')).toBeNull();
+    expect(await backend.get('bereket-ciftligi:save:v1:backup:pre-v4')).toBe(rawV2);
   });
 });

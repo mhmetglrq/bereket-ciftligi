@@ -4,6 +4,7 @@ import { isUnlocked } from './xp';
 import type { CropId, GameState, Result } from './types';
 import type { ItemId } from './types';
 import { getStock, setStock, itemPrice } from './inventory';
+import { inSeason } from './seasons';
 
 export function sellItem(state: GameState, id: ItemId, amount: number | 'all'): Result {
   const count = amount === 'all' ? getStock(state, id) : amount;
@@ -43,6 +44,8 @@ export function sellEgg(state: GameState, amount: number | 'all'): Result {
 
 export function buySeed(state: GameState, cropId: CropId, amount: number): Result {
   if (!isUnlocked(cropId, state.xp)) return { ok: false, reason: 'locked' };
+  if (state.season === 'winter') return { ok: false, reason: 'winter' };
+  if (!inSeason(cropId, state.season)) return { ok: false, reason: 'wrongSeason' };
   if (amount !== 1 && amount !== 5) return { ok: false, reason: 'invalidAmount' };
   const cost = CROPS[cropId].seedCost * amount;
   if (state.gold < cost) return { ok: false, reason: 'notEnoughGold' };

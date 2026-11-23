@@ -4,7 +4,7 @@ import { levelOf } from './xp';
 import type { BuildingId, GameState, ItemId, RecipeId, Result } from './types';
 const success = (state: GameState): Result => ({ ok: true, state, events: [{ type: 'production', amount: 1 }] });
 export function advance(state: GameState, now: number): GameState {
-  now = Math.max(state.savedAt, now);
+  now = state.elapsedMinutes;
   let buildings = state.buildings;
   for (const id of ['mill', 'bakery'] as const) {
     const building = buildings[id];
@@ -29,7 +29,8 @@ export function queue(state: GameState, id: BuildingId, recipeId: RecipeId, now:
   if (building.queue.length >= 3) return { ok: false, reason: 'queueFull' };
   const paid = consume(state, RECIPES[recipeId].inputs);
   if (!paid) return { ok: false, reason: 'missingIngredients' };
-  const startAt = Math.max(now, state.savedAt, building.queue.at(-1)?.endsAt ?? now);
+  now = state.elapsedMinutes;
+  const startAt = Math.max(now, building.queue.at(-1)?.endsAt ?? now);
   const baseId = `${id}:${startAt}:${recipeId}`;
   let jobId = baseId;
   let suffix = 0;
@@ -43,7 +44,7 @@ export function cancel(state: GameState, id: BuildingId, jobId: string, now: num
   const index = building.queue.findIndex(job => job.id === jobId);
   const job = building.queue[index];
   if (!job) return { ok: false, reason: 'nothingReady' };
-  if (Math.max(now, state.savedAt) >= job.startAt) return { ok: false, reason: 'jobStarted' };
+  if (state.elapsedMinutes >= job.startAt) return { ok: false, reason: 'jobStarted' };
   for (const [item, qty] of Object.entries(RECIPES[job.recipeId].inputs)) state = setStock(state, item as ItemId, getStock(state, item as ItemId) + qty);
   const duration = job.endsAt - job.startAt;
   return success({ ...state, buildings: { ...state.buildings, [id]: { ...building, queue: building.queue.filter(j => j.id !== jobId).map((j, i) => i >= index ? { ...j, startAt: j.startAt - duration, endsAt: j.endsAt - duration } : j) } } });

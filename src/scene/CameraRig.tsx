@@ -6,6 +6,7 @@ import { useGame } from '../store/game';
 import { applyAction } from '../sim/actions';
 import type { Reason } from '../sim/types';
 import { tr } from '../i18n/tr';
+import { cellPosition } from '../sim/layout';
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
@@ -34,7 +35,9 @@ export function CameraRig() {
       ndc.set(((point.x - rect.left) / rect.width) * 2 - 1, -((point.y - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(ndc, camera);
       if (!raycaster.ray.intersectPlane(plane, hit)) return null;
-      return { x: Math.floor(hit.x + 0.5), y: Math.floor(hit.z + 0.5) };
+      const s = useGame.getState();
+      const cell = s.game.cells.find(c => { const p = cellPosition(c, s.game.layout); return Math.abs(p.x - hit.x) <= 0.5 && Math.abs(p.y - hit.z) <= 0.5; });
+      return cell ? { x: cell.x, y: cell.y } : null;
     };
     const flush = (): void => {
       frame = 0;
@@ -42,22 +45,26 @@ export function CameraRig() {
       if (!point || stopped) return;
       const cell = cellAt(point);
       if (!cell) return;
-      const size = useGame.getState().game.gridSize;
-      const ids = interpolateCells(lastCell ?? cell, cell).filter(id => {
-        const [x, y] = id.split(',').map(Number);
-        if (x < 0 || y < 0 || x >= size || y >= size || visited.has(id)) return false;
-        visited.add(id); return true;
+      const game = useGame.getState().game;
+      const original = game.cells.find(c => c.x === cell.x && c.y === cell.y);
+      if (!original) return;
+      const position = cellPosition(original, game.layout);
+      const ids = interpolateCells(lastCell ?? position, position).flatMap(worldId => {
+        const [x, y] = worldId.split(',').map(Number);
+        const target = game.cells.find(c => { const p = cellPosition(c, game.layout); return p.x === x && p.y === y; });
+        if (!target || visited.has(target.id)) return [];
+        visited.add(target.id); return [target.id];
       });
-      lastCell = cell;
+      lastCell = position;
       if (ids.length) stopped = !useGame.getState().paintCells(ids);
     };
     const gestures = new PointerGestures({
       paintStart: point => {
         const state = useGame.getState();
-        if (!state.tool || state.phase !== 'playing' || state.panel || state.away || state.conflict) return false;
+        if (!state.tool || state.phase !== 'playing' || state.panel || state.editMode || state.modalQueue.length || state.conflict) return false;
         const cell = cellAt(point);
         if (!cell || cell.x < 0 || cell.y < 0 || cell.x >= state.game.gridSize || cell.y >= state.game.gridSize) return false;
-        visited.clear(); lastCell = cell; stopped = false;
+        visited.clear(); lastCell = null; stopped = false;
         const cellId = `${cell.x},${cell.y}`;
         const probe = applyAction(state.game, state.tool === 'plant' ? { type: 'plant', cellId, cropId: state.seed } : { type: state.tool, cellId }, state.now);
         initialReason = probe.ok ? null : probe.reason;
@@ -83,18 +90,15 @@ export function CameraRig() {
       },
       tap: point => {
         const state = useGame.getState();
-        if (state.phase !== 'playing' || state.panel || state.away || state.conflict) return;
+        if (state.phase !== 'playing' || state.editMode || state.modalQueue.length || state.panel || state.conflict) return;
         const rect = element.getBoundingClientRect();
         raycaster.setFromCamera(new Vector2(
           ((point.x - rect.left) / rect.width) * 2 - 1,
           -((point.y - rect.top) / rect.height) * 2 + 1
         ), camera);
         if (!raycaster.ray.intersectPlane(plane, hit)) return;
-        const x = Math.floor(hit.x + 0.5);
-        const y = Math.floor(hit.z + 0.5);
-        if (x >= 0 && y >= 0 && x < state.game.gridSize && y < state.game.gridSize) {
-          state.selectCell(`${x},${y}`);
-        }
+        const cell = cellAt(point);
+        if (cell) state.selectCell(`${cell.x},${cell.y}`);
       },
       pan: (dx, dy) => {
         const zoom = current.current.zoom;
@@ -107,17 +111,31 @@ export function CameraRig() {
     });
     const point = (event: PointerEvent) => ({ x: event.clientX, y: event.clientY });
     const down = (event: PointerEvent): void => {
+      if (useGame.getState().editMode || useGame.getState().isDragging || useGame.getState().modalQueue.length) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       element.setPointerCapture(event.pointerId);
       gestures.down(event.pointerId, point(event));
     };
-    const move = (event: PointerEvent): void => gestures.move(event.pointerId, point(event));
+    const move = (event: PointerEvent): void => {
+      const s = useGame.getState();
+      if (s.isDragging || s.editMode) return;
+      if (!s.painting) {
+        const p = cellAt(point(event));
+        const cell = p && s.game.cells.find(c => c.x === p.x && c.y === p.y);
+        if (cell) {
+          const id = cell.kind === 'tree' ? `tree:${cell.id}` : `plot-${Math.floor(cell.y / 2) * 4 + Math.floor(cell.x / 2)}`;
+          if (s.hoveredObject !== id) useGame.setState({ hoveredObject: id });
+        } else if (s.hoveredObject?.startsWith('plot-') || s.hoveredObject?.startsWith('tree:')) useGame.setState({ hoveredObject: null });
+      }
+      gestures.move(event.pointerId, point(event));
+    };
     const up = (event: PointerEvent): void => {
       gestures.up(event.pointerId, point(event));
       if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
     };
     const cancel = (): void => gestures.cancel();
     const wheel = (event: WheelEvent): void => {
+      if (useGame.getState().isDragging) return;
       event.preventDefault();
       gestures.cancel();
       target.current.zoom = clamp(target.current.zoom * Math.exp(-event.deltaY * 0.001), 28, 115);
@@ -142,7 +160,7 @@ export function CameraRig() {
 
   useFrame((_, delta) => {
     const state = useGame.getState();
-    if (state.painting) return;
+    if (state.painting || state.isDragging) return;
     const center = (state.game.gridSize - 1) / 2;
     target.current.x = clamp(target.current.x, center - 3.5, center + 3.5);
     target.current.z = clamp(target.current.z, center - 3.5, center + 3.5);

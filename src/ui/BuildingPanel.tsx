@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGame } from '../store/game';
 import { RECIPES } from '../sim/data';
 import { canAfford, getStock } from '../sim/inventory';
-import { formatDuration, formatNumber } from '../sim/format';
+import { formatNumber } from '../sim/format';
 import type { BuildingId, ItemId, RecipeId } from '../sim/types';
 import { tr } from '../i18n/tr';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -17,7 +17,7 @@ export function BuildingPanel({ id }: { id: BuildingId }) {
       return <article className="feature-card" key={r}>
         <h3>{tr.items[r]}</h3>
         {Object.entries(recipe.inputs).map(([item, qty]) => <p key={item} className={getStock(game, item as ItemId) < qty ? 'shortage' : ''}>{formatNumber(qty)} {tr.items[item as ItemId]} · {formatNumber(getStock(game, item as ItemId))}/{formatNumber(qty)}</p>)}
-        <p>→ 1 {tr.items[r]} · {formatDuration(recipe.ms)}</p>
+        <p>→ 1 {tr.items[r]} · {recipe.ms / 60} oyun saati</p>
         <button className="primary" disabled={readonly || !building.owned || building.queue.length >= 3 || !canAfford(game, recipe.inputs)} onClick={() => dispatch({ type: 'queueProduction', buildingId: id, recipeId: r })}>{tr.produceAction}</button>
         {!canAfford(game, recipe.inputs) && <small className="shortage">{tr.reasons.missingIngredients}</small>}
         {building.queue.length >= 3 && <small>{tr.reasons.queueFull}</small>}
@@ -29,7 +29,7 @@ export function BuildingPanel({ id }: { id: BuildingId }) {
       const job = building.queue[i];
       return <article className="feature-card queue-slot" key={i}>{job ? <>
         <strong>{tr.items[job.recipeId]}</strong>
-        {job.startAt > now ? <><span>{tr.waiting}</span><button aria-label={tr.cancelJobTitle} onClick={() => setCancelId(job.id)} disabled={readonly}>×</button></> : <><progress max={job.endsAt - job.startAt} value={Math.max(0, now - job.startAt)} aria-label={tr.production} /><span>{formatDuration(job.endsAt - now)}</span></>}
+        {job.startAt > now ? <><span>{tr.waiting}</span><button aria-label={tr.cancelJobTitle} onClick={() => setCancelId(job.id)} disabled={readonly}>×</button></> : <><progress max={job.endsAt - job.startAt} value={Math.max(0, now - job.startAt)} aria-label={tr.production} /><span>{Math.max(0, job.endsAt - now)} oyun dakikası</span></>}
       </> : <span className="muted">{tr.emptyJob}</span>}</article>;
     })}</div>
     {Object.values(building.readyOutput).some(q => q > 0) && <article className="feature-card ready-output">

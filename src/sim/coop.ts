@@ -1,17 +1,8 @@
-import { CHICKEN_COST, COOP_COST, EGG_MS, MAX_CHICKENS } from './data';
+import { CHICKEN_COST, COOP_COST, MAX_CHICKENS } from './data';
 import type { GameState, Result } from './types';
 
 export function settleCoop(state: GameState, now: number): GameState {
-  let laid = 0;
-  const chickens = state.coop.chickens.map(chicken => {
-    if (chicken.fedAt === null || now - chicken.fedAt < EGG_MS) return chicken;
-    laid++;
-    return { ...chicken, fedAt: null };
-  });
-  return laid === 0 ? state : {
-    ...state,
-    coop: { ...state.coop, chickens, pendingEggs: state.coop.pendingEggs + laid }
-  };
+  return state;
 }
 
 export function buyCoop(state: GameState): Result {
