@@ -2,6 +2,14 @@ import { CROPS, EGG_PRICE, EXPANSION_COST } from './data';
 import { expandedCells } from './grid';
 import { isUnlocked } from './xp';
 import type { CropId, GameState, Result } from './types';
+import type { ItemId } from './types';
+import { getStock, setStock, itemPrice } from './inventory';
+
+export function sellItem(state: GameState, id: ItemId, amount: number | 'all'): Result {
+  const count = amount === 'all' ? getStock(state, id) : amount;
+  if (!Number.isSafeInteger(count) || count < 1 || count > getStock(state, id)) return { ok: false, reason: 'noProduce' };
+  return { ok: true, state: { ...setStock(state, id, getStock(state, id) - count), gold: state.gold + count * itemPrice(id) }, events: [{ type: 'sell', amount: count }] };
+}
 
 export function sell(state: GameState, cropId: CropId, amount: number | 'all'): Result {
   const count = amount === 'all' ? state.produce[cropId] : amount;

@@ -1,4 +1,21 @@
-import type { CropId, Inventory } from './types';
+import type { CropId, Inventory, GameState, ItemId, RecipeId } from './types';
+
+export const GOODS = { flour: 30, bread: 75, cake: 110, apple: 25, cherry: 40 } as const;
+export const BUILDINGS = { mill: { cost: 200, level: 2 }, bakery: { cost: 350, level: 4 } } as const;
+export const TREES = { apple: { cost: 150, level: 3, growMs: 240_000, regrowMs: 120_000 }, cherry: { cost: 250, level: 6, growMs: 360_000, regrowMs: 180_000 } } as const;
+export const RECIPES: Record<RecipeId, { building: 'mill' | 'bakery'; inputs: Partial<Record<ItemId, number>>; ms: number }> = {
+  flour: { building: 'mill', inputs: { wheat: 3 }, ms: 45_000 },
+  bread: { building: 'bakery', inputs: { flour: 2 }, ms: 60_000 },
+  cake: { building: 'bakery', inputs: { flour: 1, eggs: 2 }, ms: 90_000 }
+};
+export function featureDefaults(): Pick<GameState, 'goods' | 'buildings' | 'orders' | 'daily'> {
+  return {
+    goods: { flour: 0, bread: 0, cake: 0, apple: 0, cherry: 0 },
+    buildings: { mill: { owned: false, queue: [], readyOutput: {} }, bakery: { owned: false, queue: [], readyOutput: {} } },
+    orders: Array.from({ length: 3 }, () => ({ order: null, refillAt: 0, generation: 0 })),
+    daily: { lastClaim: null, streak: 0, date: '', quests: [] }
+  };
+}
 
 export const CROP_IDS: CropId[] = ['wheat', 'carrot', 'tomato', 'corn', 'strawberry'];
 export const CROPS = {

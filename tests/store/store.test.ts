@@ -32,7 +32,7 @@ describe('store actions', () => {
     const before = useGame.getState().game;
     useGame.getState().dispatch({ type: 'plant', cellId: '0,0', cropId: 'wheat' });
     expect(useGame.getState().game).toBe(before);
-    expect(useGame.getState().floaters.at(-1)?.text).toBe(tr.invalid);
+    expect(useGame.getState().toasts.at(-1)?.text).toBe(tr.reasons.needTill);
     expect(useGame.getState().requestSave).not.toHaveBeenCalled();
   });
 
@@ -44,11 +44,12 @@ describe('store actions', () => {
     expect(useGame.getState().requestSave).not.toHaveBeenCalled();
   });
 
-  it('keeps at most five floating texts', () => {
+  it('keeps at most four toasts and leaves the scene clear', () => {
     for (let x = 0; x < 6; x++) {
       useGame.getState().dispatch({ type: 'till', cellId: `${x},0` });
     }
-    expect(useGame.getState().floaters).toHaveLength(5);
+    expect(useGame.getState().floaters).toHaveLength(0);
+    expect(useGame.getState().toasts).toHaveLength(4);
   });
 });
 

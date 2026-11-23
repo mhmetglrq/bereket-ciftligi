@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createStore, type StoreApi } from 'zustand';
 import { createUISlice, WARNING_ID, type UISlice } from '../../src/store/slices/uiSlice';
 import type { Store } from '../../src/store/game';
+import { newGame } from '../../src/sim/grid';
 
 describe('UI Feedback & Toast constraints', () => {
   let store: StoreApi<Store>;
@@ -9,15 +10,16 @@ describe('UI Feedback & Toast constraints', () => {
   beforeEach(() => {
     store = createStore<Store>()((set, get, api) => ({
       ...createUISlice(set, get, api),
-      game: {} as any,
+      game: newGame(0),
       dispatch: () => {},
       selectCell: () => {},
+      paintCells: () => true,
       mayWrite: () => true,
       requestSave: () => {}
     }));
   });
 
-  it('enforces maximum 3 toasts using plain FIFO eviction', () => {
+  it('enforces maximum 4 toasts using plain FIFO eviction', () => {
     const notify = store.getState().notify;
 
     notify('Toast 1');
@@ -28,17 +30,17 @@ describe('UI Feedback & Toast constraints', () => {
     expect(toasts.length).toBe(3);
     expect(toasts.map(t => t.text)).toEqual(['Toast 1', 'Toast 2', 'Toast 3']);
 
-    // Adding 4th toast evicts the oldest (Toast 1)
+    // Four notifications fit before FIFO eviction.
     notify('Toast 4');
     toasts = store.getState().toasts;
-    expect(toasts.length).toBe(3);
-    expect(toasts.map(t => t.text)).toEqual(['Toast 2', 'Toast 3', 'Toast 4']);
+    expect(toasts.length).toBe(4);
+    expect(toasts.map(t => t.text)).toEqual(['Toast 1', 'Toast 2', 'Toast 3', 'Toast 4']);
 
-    // Adding 5th toast evicts Toast 2
+    // The fifth notification evicts the oldest.
     notify('Toast 5');
     toasts = store.getState().toasts;
-    expect(toasts.length).toBe(3);
-    expect(toasts.map(t => t.text)).toEqual(['Toast 3', 'Toast 4', 'Toast 5']);
+    expect(toasts.length).toBe(4);
+    expect(toasts.map(t => t.text)).toEqual(['Toast 2', 'Toast 3', 'Toast 4', 'Toast 5']);
   });
 
   it('deduplicates warning, sets 1200 ms TTL and fixed WARNING_ID', () => {

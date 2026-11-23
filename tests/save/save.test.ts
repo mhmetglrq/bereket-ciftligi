@@ -35,7 +35,7 @@ describe('schema and serialization', () => {
   it('does not invent migrations for unknown or unversioned schemas', () => {
     expect(migrate({ version: 0 }).kind).toBe('corrupt');
     expect(migrate({}).kind).toBe('corrupt');
-    expect(migrate({ version: 3 }).kind).toBe('future');
+    expect(migrate({ version: 4 }).kind).toBe('future');
   });
 });
 

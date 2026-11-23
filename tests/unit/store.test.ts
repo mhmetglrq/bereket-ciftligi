@@ -33,7 +33,7 @@ describe('Zustand Game Store Actions', () => {
     const before = useGame.getState().game;
     useGame.getState().dispatch({ type: 'plant', cellId: '0,0', cropId: 'wheat' });
     expect(useGame.getState().game).toBe(before);
-    expect(useGame.getState().floaters.at(-1)?.text).toBe(tr.invalid);
+    expect(useGame.getState().toasts.at(-1)?.text).toBe(tr.reasons.needTill);
     expect(useGame.getState().requestSave).not.toHaveBeenCalled();
   });
 

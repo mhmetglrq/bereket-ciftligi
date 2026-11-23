@@ -14,10 +14,11 @@ export interface Instance {
   color?: string;
 }
 
-export function Batch({ assetId, items, assets }: {
+export function Batch({ assetId, items, assets, castShadow = true }: {
   assetId: string;
   items: Instance[];
   assets: Assets;
+  castShadow?: boolean;
 }) {
   const ref = useRef<InstancedMesh>(null);
   const asset = assets.get(assetId);
@@ -42,7 +43,7 @@ export function Batch({ assetId, items, assets }: {
   return (
     <instancedMesh ref={ref}
       args={[asset.geometry, asset.material, Math.max(1, items.length)]}
-      castShadow receiveShadow dispose={null} />
+      castShadow={castShadow} receiveShadow dispose={null} />
   );
 }
 
@@ -53,7 +54,7 @@ export function Tiles({ assets }: { assets: Assets }) {
   const soil: Instance[] = [];
   const furrows: Instance[] = [];
   cells.forEach(cell => {
-    if (cell.kind === 'untilled') {
+    if (cell.kind === 'untilled' || cell.kind === 'tree') {
       grass.push({ x: cell.x, y: 0, z: cell.y });
     } else {
       soil.push({

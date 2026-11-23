@@ -3,8 +3,10 @@ import { DAY_MS } from '../sim/data';
 import { xpProgress } from '../sim/xp';
 import { tr } from '../i18n/tr';
 import { number } from '../i18n/format';
+import { canAfford } from '../sim/inventory';
 
 export function Hud() {
+  const orderCount = useGame(s => s.game.orders.filter(slot => slot.order && canAfford(s.game, slot.order.items)).length);
   const gold = useGame(state => state.game.gold);
   const xp = useGame(state => state.game.xp);
   const size = useGame(state => state.game.gridSize);
@@ -45,6 +47,8 @@ export function Hud() {
           )}
         </div>
         <nav className="nav panel" aria-label={tr.title}>
+          <button onClick={() => setPanel('orders')} aria-label={`${tr.orders} · ${number(orderCount)}`}>📋 <span>{tr.orders}</span>{orderCount > 0 && <b className="badge">{number(orderCount)}</b>}</button>
+          <button onClick={() => setPanel('daily')} aria-label={tr.daily}>🎁</button>
           <button onClick={() => setPanel('market')}>🧺 <span>{tr.market}</span></button>
           {coopOwned && <button onClick={() => setPanel('coop')} aria-label={tr.coop}>🐔</button>}
           <button onClick={() => setPanel('quests')}>📜 <span>{tr.quests}</span>{count > 0 && <b className="badge">{number(count)}</b>}</button>

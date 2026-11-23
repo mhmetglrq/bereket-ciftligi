@@ -6,6 +6,11 @@ import { applyQuestEvents, claimQuest } from './quests';
 import { rescue } from './rescue';
 import { isUnlocked, xpFor } from './xp';
 import { advanceOffline } from './offline';
+import { sellItem } from './economy';
+import * as production from './production';
+import * as orders from './orders';
+import * as daily from './daily';
+import { plantTree, harvestTree, removeTree } from './trees';
 import type { Action, Cell, CropId, GameState, Result, Tool } from './types';
 
 export { buyExpansion, buySeed, sell, sellEgg, claimQuest };
@@ -17,6 +22,7 @@ function replace(state: GameState, cell: Cell): GameState {
 export function till(state: GameState, cellId: string): Result {
   const cell = state.cells.find(item => item.id === cellId);
   if (!cell) return { ok: false, reason: 'missingCell' };
+  if (cell.kind === 'tree') return { ok: false, reason: 'treeOccupied' };
   if (cell.kind !== 'untilled') return { ok: false, reason: 'alreadyTilled' };
   return {
     ok: true,
@@ -30,6 +36,7 @@ export function plant(state: GameState, cellId: string, cropId: CropId, now: num
   const cell = state.cells.find(item => item.id === cellId);
   if (!cell) return { ok: false, reason: 'missingCell' };
   if (cell.kind === 'untilled') return { ok: false, reason: 'needTill' };
+  if (cell.kind === 'tree') return { ok: false, reason: 'treeOccupied' };
   if (cell.kind === 'planted') return { ok: false, reason: 'occupied' };
   if (state.seeds[cropId] < 1) return { ok: false, reason: 'noSeeds' };
   return {
@@ -44,6 +51,7 @@ export function plant(state: GameState, cellId: string, cropId: CropId, now: num
 
 export function harvest(state: GameState, cellId: string, now: number): Result {
   const cell = state.cells.find(item => item.id === cellId);
+  if (cell?.kind === 'tree') return harvestTree(state, cellId, now);
   if (!cell) return { ok: false, reason: 'missingCell' };
   if (cell.kind !== 'planted') return { ok: false, reason: 'notPlanted' };
   if (!isRipe(cell, now)) return { ok: false, reason: 'notRipe' };
@@ -59,6 +67,7 @@ export function harvest(state: GameState, cellId: string, now: number): Result {
 
 export function water(state: GameState, cellId: string, now: number): Result {
   const cell = state.cells.find(item => item.id === cellId);
+  if (cell?.kind === 'tree') return { ok: false, reason: 'treeOccupied' };
   if (!cell || cell.kind !== 'planted' || isRipe(cell, now) || isWatered(cell, now)) {
     return { ok: false, reason: 'notApplicable' };
   }
@@ -78,8 +87,20 @@ export function water(state: GameState, cellId: string, now: number): Result {
 
 export function applyAction(state: GameState, action: Action, now: number): Result {
   state = now < state.savedAt ? advanceOffline(state, now).state : settleCoop(state, now);
+  state = daily.rollDailyQuests(orders.refill(production.advance(state, now), now), now);
   let result: Result;
   switch (action.type) {
+    case 'buyBuilding': result = production.buyBuilding(state, action.buildingId); break;
+    case 'queueProduction': result = production.queue(state, action.buildingId, action.recipeId, now); break;
+    case 'cancelProduction': result = production.cancel(state, action.buildingId, action.jobId, now); break;
+    case 'collectProduction': result = production.collect(state, action.buildingId, now); break;
+    case 'plantTree': result = plantTree(state, action.cellId, action.treeId, now); break;
+    case 'removeTree': result = removeTree(state, action.cellId); break;
+    case 'sellItem': result = sellItem(state, action.itemId, action.amount); break;
+    case 'deliverOrder': result = orders.deliver(state, action.slot, now); break;
+    case 'rejectOrder': result = orders.reject(state, action.slot, now); break;
+    case 'claimDaily': result = daily.claimDaily(state, now); break;
+    case 'claimDailyQuest': result = daily.claimQuest(state, action.questId, now); break;
     case 'till': result = till(state, action.cellId); break;
     case 'plant': result = plant(state, action.cellId, action.cropId, now); break;
     case 'harvest': result = harvest(state, action.cellId, now); break;
@@ -96,10 +117,10 @@ export function applyAction(state: GameState, action: Action, now: number): Resu
     case 'collectEgg': result = collectEgg(state, now); break;
   }
   if (!result.ok) return result;
-  const checked = rescue(applyQuestEvents({
+  const checked = rescue(daily.track(applyQuestEvents({
     ...result.state,
     xp: result.state.xp + xpFor(result.events)
-  }, result.events));
+  }, result.events), result.events, now));
   return {
     ok: true,
     state: { ...checked.state, savedAt: now },

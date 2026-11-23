@@ -16,10 +16,12 @@ import { TitleScreen } from './ui/TitleScreen';
 import { PauseMenu } from './ui/PauseMenu';
 import { FieldList } from './ui/FieldList';
 import { Toasts } from './ui/Toasts';
-import { Floaters } from './ui/Floaters';
 import { TabConflict } from './ui/TabConflict';
 import { Modal } from './ui/Modal';
 import { tr } from './i18n/tr';
+import { BuildingPanel } from './ui/BuildingPanel';
+import { OrderBoard } from './ui/OrderBoard';
+import { DailyReward } from './ui/DailyReward';
 
 export default function App() {
   const phase = useGame(state => state.phase);
@@ -81,7 +83,6 @@ export default function App() {
       </div>
       <TabConflict />
       <Toasts />
-      <Floaters />
       {phase === 'playing' && !conflict && (
         away ? (
           <Modal key="away" title={tr.away} onClose={() => useGame.setState({ away: null })}>
@@ -89,6 +90,9 @@ export default function App() {
           </Modal>
         ) : panel ? (
           <Modal key={panel} title={title} onClose={close}>
+            {(panel === 'mill' || panel === 'bakery') && <BuildingPanel id={panel} />}
+            {panel === 'orders' && <OrderBoard />}
+            {panel === 'daily' && <DailyReward />}
             {panel === 'market' && <Market />}
             {panel === 'coop' && <CoopPanel />}
             {panel === 'quests' && <Quests />}
