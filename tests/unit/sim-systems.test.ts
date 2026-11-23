@@ -1,3 +1,5 @@
+import { newGame } from '../../src/sim/grid';
+import { endDay } from '../../src/sim/dayEnd';
 import { describe, it, expect } from 'vitest';
 import { hashString, mulberry32 } from '../../src/sim/rng';
 import { canAfford, consume, getStock, itemPrice, setStock, ITEM_IDS } from '../../src/sim/inventory';
@@ -9,7 +11,7 @@ import { localDateKey, nextRewardDay, rollDailyQuests, claimDaily, claimQuest, t
 import { applyBatch } from '../../src/sim/batch';
 import { BUILDINGS, RECIPES, TREES, QUESTS } from '../../src/sim/data';
 import { thresholdFor } from '../../src/sim/xp';
-import type { GameState, Result } from '../../src/sim/types';
+import type { GameState, Result, ItemId } from '../../src/sim/types';
 
 function success(result: Result): Extract<Result, { ok: true }> {
   expect(result.ok).toBe(true);
@@ -32,15 +34,16 @@ function createBaseState(overrides: Partial<GameState> = {}): GameState {
   }
 
   return {
-    version: 3,
+    ...newGame(1000),
+    version: 4, season: 'summer', weather: 'sunny',
     createdAt: 1000,
     savedAt: 1000,
     gridSize: 6,
     gold: 500,
     xp: thresholdFor(3),
     eggs: 5,
-    seeds: { wheat: 10, carrot: 5, tomato: 5, corn: 0, strawberry: 0 },
-    produce: { wheat: 10, carrot: 0, tomato: 0, corn: 0, strawberry: 0 },
+    seeds: { wheat: 10, carrot: 5, tomato: 5, corn: 0, strawberry: 0, pumpkin: 0 },
+    produce: { wheat: 10, carrot: 0, tomato: 0, corn: 0, strawberry: 0, pumpkin: 0 },
     goods: { flour: 0, bread: 0, cake: 0, apple: 0, cherry: 0 },
     coop: { owned: true, pendingEggs: 0, chickens: [{ id: 'c1', fedAt: null }] },
     buildings: {
@@ -98,7 +101,7 @@ describe('inventory', () => {
   it('consume either removes all requested items or nothing if unaffordable', () => {
     const state = createBaseState({
       eggs: 5,
-      produce: { wheat: 3, carrot: 0, tomato: 0, corn: 0, strawberry: 0 }
+      produce: { wheat: 3, carrot: 0, tomato: 0, corn: 0, strawberry: 0, pumpkin: 0 }
     });
 
     expect(canAfford(state, { wheat: 2, eggs: 3 })).toBe(true);
@@ -148,7 +151,7 @@ describe('production', () => {
 
   it('queues at most 3 jobs and takes ingredients upon queuing', () => {
     let state = createBaseState({
-      produce: { wheat: 15, carrot: 0, tomato: 0, corn: 0, strawberry: 0 }
+      produce: { wheat: 15, carrot: 0, tomato: 0, corn: 0, strawberry: 0, pumpkin: 0 }
     });
 
     const now = 10_000;
@@ -169,9 +172,9 @@ describe('production', () => {
     expect(failure(res4).reason).toBe('queueFull');
   });
 
-  it('jobs run back-to-back and advance finishes jobs after offline time without auto-adding to barn', () => {
+  it('jobs run back-to-back and advance finishes jobs after game time without auto-adding to barn', () => {
     let state = createBaseState({
-      produce: { wheat: 9, carrot: 0, tomato: 0, corn: 0, strawberry: 0 },
+      produce: { wheat: 9, carrot: 0, tomato: 0, corn: 0, strawberry: 0, pumpkin: 0 },
       goods: { flour: 0, bread: 0, cake: 0, apple: 0, cherry: 0 }
     });
 
@@ -185,10 +188,10 @@ describe('production', () => {
 
     // Advance 5 hours later
     const future = start + 5 * 3600 * 1000;
-    const advanced = advance(state, future);
+    const advanced = advance({ ...state, elapsedMinutes: future }, future);
     expect(advanced.buildings.mill.queue).toHaveLength(0);
     expect(advanced.buildings.mill.readyOutput['flour']).toBe(2);
-    // Offline catch-up never adds directly to barn (goods)
+    // Production completion never adds directly to barn (goods)
     expect(advanced.goods.flour).toBe(0);
 
     // Collect moves readyOutput into barn
@@ -200,7 +203,7 @@ describe('production', () => {
 
   it('cancelling a job that has not started refunds ingredients', () => {
     let state = createBaseState({
-      produce: { wheat: 9, carrot: 0, tomato: 0, corn: 0, strawberry: 0 }
+      produce: { wheat: 9, carrot: 0, tomato: 0, corn: 0, strawberry: 0, pumpkin: 0 }
     });
     const now = 10_000;
     state = success(queue(state, 'mill', 'flour', now)).state;
@@ -238,7 +241,7 @@ describe('trees', () => {
     expect(cell?.kind).toBe('tree');
     if (cell?.kind === 'tree') {
       expect(cell.treeId).toBe('apple');
-      expect(cell.ripeAt).toBe(now + TREES.apple.growMs);
+      expect(cell.ripeAt).toBe(28);
       expect(cell.harvested).toBe(false);
     }
   });
@@ -256,6 +259,7 @@ describe('trees', () => {
 
     // Harvest once ripe
     const ripeTime = plantedAt + TREES.apple.growMs;
+    for (let i = 0; i < 28; i++) state = endDay(state).state;
     const harvested = harvestTree(state, cellId, ripeTime);
     expect(harvested.ok).toBe(true);
     expect(success(harvested).state.goods.apple).toBe(1);
@@ -264,7 +268,7 @@ describe('trees', () => {
     expect(cellAfter?.kind).toBe('tree');
     if (cellAfter?.kind === 'tree') {
       expect(cellAfter.harvested).toBe(true);
-      expect(cellAfter.ripeAt).toBe(ripeTime + TREES.apple.regrowMs);
+      expect(cellAfter.fruitReady).toBe(false);
     }
   });
 
@@ -323,12 +327,12 @@ describe('orders', () => {
 
     let rawValue = 0;
     for (const [id, qty] of Object.entries(order.items)) {
-      rawValue += (qty as number) * itemPrice(id as any);
+      rawValue += (qty as number) * itemPrice(id as ItemId);
     }
     expect(order.gold).toBe(Math.round(rawValue * 1.25));
   });
 
-  it('refill generates orders after 120s cooldown and preserves deterministic generation', () => {
+  it('refill generates orders at its game-minute boundary and preserves deterministic generation', () => {
     let state = createBaseState({
       orders: [
         { order: null, refillAt: 10_000, generation: 0 },
@@ -338,19 +342,19 @@ describe('orders', () => {
     });
 
     // Refill at now = 15_000 -> only first slot refills
-    state = refill(state, 15_000);
+    state = refill({ ...state, elapsedMinutes: 15_000 }, 15_000);
     expect(state.orders[0].order).not.toBeNull();
     expect(state.orders[1].order).toBeNull();
     expect(state.orders[2].order).toBeNull();
   });
 
-  it('delivers order when player has ingredients and sets 120s refill timer', () => {
+  it('delivers order when player has ingredients and sets next-morning refill', () => {
     let state = createBaseState();
     state = refill(state, 10_000);
     const order = state.orders[0].order!;
     // Give enough items
     for (const [id, qty] of Object.entries(order.items)) {
-      state = setStock(state, id as any, (qty as number) + 5);
+      state = setStock(state, id as ItemId, (qty as number) + 5);
     }
 
     const goldBefore = state.gold;
@@ -359,17 +363,17 @@ describe('orders', () => {
     expect(res.ok).toBe(true);
     expect(success(res).state.gold).toBe(goldBefore + order.gold);
     expect(success(res).state.orders[0].order).toBeNull();
-    expect(success(res).state.orders[0].refillAt).toBe(now + 120_000);
+    expect(success(res).state.orders[0].refillAt).toBe(state.elapsedMinutes + 1560 - state.minute);
   });
 
-  it('rejecting order empties the slot and sets 120s refill timer', () => {
+  it('rejecting order empties the slot and sets next-morning refill', () => {
     let state = createBaseState();
     state = refill(state, 10_000);
     const now = 20_000;
     const res = reject(state, 0, now);
     expect(res.ok).toBe(true);
     expect(success(res).state.orders[0].order).toBeNull();
-    expect(success(res).state.orders[0].refillAt).toBe(now + 120_000);
+    expect(success(res).state.orders[0].refillAt).toBe(state.elapsedMinutes + 1560 - state.minute);
   });
 });
 
@@ -447,7 +451,7 @@ describe('daily', () => {
 describe('batch', () => {
   it('processes each cell once, skips trees on non-harvest, and stops on first blocking error', () => {
     let state = createBaseState({
-      seeds: { wheat: 2, carrot: 0, tomato: 0, corn: 0, strawberry: 0 }
+      seeds: { wheat: 2, carrot: 0, tomato: 0, corn: 0, strawberry: 0, pumpkin: 0 }
     });
     // Till 4 cells
     state.cells[0].kind = 'tilled';

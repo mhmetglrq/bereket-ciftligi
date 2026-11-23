@@ -6,10 +6,11 @@ import { useLayoutEffect } from 'react';
 export function Toasts() {
   const toasts = useGame(state => state.toasts);
   const phase = useGame(state => state.phase);
+  const editing = useGame(state => state.editMode);
   useLayoutEffect(() => {
-    const hud = document.querySelector('.hud');
+    const hud = document.querySelector('.hud, .edit-bar');
     const update = (): void => {
-      const parts = document.querySelectorAll('.hud, .hud .nav, .hud .world-status');
+      const parts = document.querySelectorAll('.hud, .hud .nav, .hud .world-status, .edit-bar');
       const bottom = Array.from(parts).reduce((max, part) => Math.max(max, part.getBoundingClientRect().bottom), 0);
       document.documentElement.style.setProperty('--hud-bottom', `${bottom}px`);
     };
@@ -17,7 +18,7 @@ export function Toasts() {
     if (hud) observer.observe(hud);
     window.addEventListener('resize', update); update();
     return () => { observer.disconnect(); window.removeEventListener('resize', update); };
-  }, [phase]);
+  }, [phase, editing]);
   return (
     <div className="toasts" role="status" aria-live="polite" aria-atomic="false">
       {toasts.map(item => (

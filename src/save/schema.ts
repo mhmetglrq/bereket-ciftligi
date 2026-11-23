@@ -1,6 +1,8 @@
 import { CROP_IDS, MAX_CHICKENS, QUESTS, RECIPES, GOODS } from '../sim/data';
 import { ITEM_IDS } from '../sim/inventory';
 import type { GameState } from '../sim/types';
+import type { Layout } from '../sim/types';
+import { canPlace, defaultLayout } from '../sim/layout';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -10,7 +12,9 @@ const natural = (value: unknown): value is number =>
   finite(value) && Number.isSafeInteger(value) && value >= 0;
 
 type LegacyInventory = Record<'wheat' | 'carrot' | 'tomato', number>;
-export type V2GameState = Omit<GameState, 'version' | 'goods' | 'buildings' | 'orders' | 'daily'> & { version: 2 };
+export type V4Fields = 'day' | 'season' | 'year' | 'minute' | 'elapsedMinutes' | 'energy' | 'weather' | 'layout' | 'shipping' | 'seenV4Intro';
+export type V3GameState = Omit<GameState, 'version' | V4Fields> & { version: 3 };
+export type V2GameState = Omit<V3GameState, 'version' | 'goods' | 'buildings' | 'orders' | 'daily'> & { version: 2 };
 export type LegacyGameState = Omit<V2GameState, 'version' | 'xp' | 'eggs' | 'coop' | 'seeds' | 'produce'> & {
   version: 1;
   seeds: LegacyInventory;
@@ -18,7 +22,7 @@ export type LegacyGameState = Omit<V2GameState, 'version' | 'xp' | 'eggs' | 'coo
 };
 
 function validate(value: unknown, legacy: boolean, version = legacy ? 1 : 2): boolean {
-  const ids = legacy ? ['wheat', 'carrot', 'tomato'] : CROP_IDS;
+  const ids = legacy ? ['wheat', 'carrot', 'tomato'] : version < 4 ? CROP_IDS.filter(id => id !== 'pumpkin') : CROP_IDS;
   const inventory = (item: unknown): boolean =>
     record(item) && ids.every(id => natural(item[id]));
   if (
@@ -87,7 +91,7 @@ function validate(value: unknown, legacy: boolean, version = legacy ? 1 : 2): bo
     });
 }
 
-export function isGameState(value: unknown): value is GameState {
+export function isV3GameState(value: unknown): value is V3GameState {
   if (!validate(value, false, 3) || !record(value)) return false;
   if (!record(value.goods) || !Object.keys(GOODS).every(id => natural((value.goods as Record<string, unknown>)[id]))) return false;
   if (!record(value.buildings)) return false;
@@ -99,7 +103,7 @@ export function isGameState(value: unknown): value is GameState {
     let end = -Infinity;
     const seen = new Set<string>();
     for (const job of building.queue) {
-      if (!record(job) || typeof job.id !== 'string' || seen.has(job.id) || typeof job.recipeId !== 'string' || !(job.recipeId in RECIPES) || RECIPES[job.recipeId as keyof typeof RECIPES].building !== id || !finite(job.startAt) || !finite(job.endsAt) || job.startAt < end || job.endsAt - job.startAt !== RECIPES[job.recipeId as keyof typeof RECIPES].ms) return false;
+      if (!record(job) || typeof job.id !== 'string' || seen.has(job.id) || typeof job.recipeId !== 'string' || !(job.recipeId in RECIPES) || RECIPES[job.recipeId as keyof typeof RECIPES].building !== id || !finite(job.startAt) || !finite(job.endsAt) || job.startAt < end || job.endsAt <= job.startAt) return false;
       end = job.endsAt; seen.add(job.id);
     }
   }
@@ -126,6 +130,32 @@ export function isGameState(value: unknown): value is GameState {
 }
 
 export function isV2GameState(value: unknown): value is V2GameState { return validate(value, false); }
+
+export function isLayout(value: unknown): value is Layout {
+  if (!Array.isArray(value) || !value.every((o: unknown) => record(o) && typeof o.id === 'string' && finite(o.x) && finite(o.y) && Number.isInteger(o.x) && Number.isInteger(o.y) && natural(o.width) && o.width > 0 && natural(o.height) && o.height > 0)) return false;
+  const layout = value as Layout;
+  return new Set(layout.map(o => o.id)).size === layout.length &&
+    layout.every(o => canPlace(layout, o) && (!o.id.startsWith('plot-') || (o.width === 2 && o.height === 2)));
+}
+
+export function isGameState(value: unknown): value is GameState {
+  if (!record(value) || value.version !== 4 || !natural(value.day) || value.day < 1 || value.day > 28 || !natural(value.year) || value.year < 1 || !['spring', 'summer', 'autumn', 'winter'].includes(String(value.season)) || !natural(value.minute) || value.minute < 360 || value.minute > 1560 || !natural(value.elapsedMinutes) || !natural(value.energy) || value.energy > 270 || !['sunny', 'rain'].includes(String(value.weather)) || typeof value.seenV4Intro !== 'boolean' || !record(value.shipping) || !Array.isArray(value.layout)) return false;
+  if (!record(value.seeds) || !record(value.produce) || !CROP_IDS.every(id => natural((value.seeds as Record<string, unknown>)[id]) && natural((value.produce as Record<string, unknown>)[id]))) return false;
+  if (!Object.entries(value.shipping).every(([id, qty]) => ITEM_IDS.includes(id as typeof ITEM_IDS[number]) && natural(qty))) return false;
+  if (!isLayout(value.layout)) return false;
+  const layout = value.layout;
+  if (!defaultLayout().filter(expected => !expected.id.startsWith('plot-')).every(expected => layout.some(o => o.id === expected.id && o.width === expected.width && o.height === expected.height))) return false;
+  if (!Array.isArray(value.cells) || !value.cells.every(c => record(c) && (!('daysRemaining' in c) || natural(c.daysRemaining)) && (!('ageDays' in c) || natural(c.ageDays)))) return false;
+  if (!value.cells.every(c => record(c) && (c.wateredToday === undefined || typeof c.wateredToday === 'boolean') && (c.dead === undefined || typeof c.dead === 'boolean') && (c.fruitReady === undefined || typeof c.fruitReady === 'boolean') && (c.kind !== 'tree' || layout.some(o => o.id === `tree:${String(c.id)}` && o.width === 1 && o.height === 1)))) return false;
+  // Reuse the complete legacy inventory/building/order validation with normalized day fields.
+  const daily = value.daily;
+  if (!record(daily) || typeof daily.date !== 'string') return false;
+  const legacy = { ...value, version: 3, daily: { ...daily, date: daily.date ? '2000-01-01' : '' }, cells: value.cells.map(c => {
+    const cell = c as Record<string, unknown>;
+    return { ...cell, water: undefined, ...(cell.kind === 'planted' && cell.cropId === 'pumpkin' ? { cropId: 'carrot' } : {}) };
+  }) };
+  return isV3GameState(legacy);
+}
 
 export function isLegacyGameState(value: unknown): value is LegacyGameState {
   return validate(value, true);

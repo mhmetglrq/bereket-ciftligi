@@ -12,10 +12,10 @@ export function FieldList() {
   return (
     <div className="field-content">
       <p className="muted">{tr.fieldHelp}</p>
-      <div className="accessible-field" style={{ gridTemplateColumns: `repeat(${game.gridSize}, minmax(0, 1fr))` }}>
+      <div className="accessible-field" style={{ gridTemplateColumns: `repeat(${game.gridSize}, minmax(44px, 1fr))` }}>
         {game.cells.map(item => (
           <button key={item.id} aria-label={cellLabel(item, now)} aria-pressed={item.id === selected} onClick={() => useGame.setState({ selected: item.id })}>
-            <span aria-hidden="true">{item.kind === 'tree' ? (item.treeId === 'apple' ? '🍎' : '🍒') : item.kind === 'planted' ? CROPS[item.cropId].icon : item.kind === 'tilled' ? '▤' : '·'}{isRipe(item, now) || item.kind === 'tree' && now >= item.ripeAt ? '✦' : ''}</span>
+            <span aria-hidden="true">{item.dead ? '✕' : item.kind === 'tree' ? (item.treeId === 'apple' ? '🍎' : '🍒') : item.kind === 'planted' ? CROPS[item.cropId].icon : item.kind === 'tilled' ? '▤' : '·'}{isRipe(item, now) || item.kind === 'tree' && item.fruitReady ? '✦' : ''}</span>
           </button>
         ))}
       </div>

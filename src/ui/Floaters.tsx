@@ -3,7 +3,7 @@ import { useGame } from '../store/game';
 export function Floaters() {
   const floaters = useGame(state => state.floaters);
   const reduced = useGame(state => state.reducedMotion);
-  const blocked = useGame(state => state.panel !== null || state.away !== null || state.conflict);
+  const blocked = useGame(state => state.panel !== null || state.modalQueue.length > 0 || state.conflict);
   if (blocked) return null;
   return (
     <div className={`floaters ${reduced ? 'static' : ''}`} aria-live="polite">

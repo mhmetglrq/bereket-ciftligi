@@ -2,6 +2,8 @@ import { QUESTS, START_GOLD, START_WHEAT_SEEDS, emptyInventory, featureDefaults 
 import type { Cell, GameState } from './types';
 import { refill } from './orders';
 import { rollDailyQuests } from './daily';
+import { defaultLayout } from './layout';
+import { morningWeather } from './weather';
 
 export function createGrid(size: 6 | 8): Cell[] {
   return Array.from({ length: size * size }, (_, index) => {
@@ -16,8 +18,10 @@ export function expandedCells(cells: Cell[]): Cell[] {
 }
 
 export function newGame(now: number): GameState {
-  return rollDailyQuests(refill({
-    version: 3,
+  return morningWeather(rollDailyQuests(refill({
+    version: 4,
+    day: 1, season: 'spring', year: 1, minute: 360, elapsedMinutes: 0,
+    energy: 270, weather: 'sunny', layout: defaultLayout(), shipping: {}, seenV4Intro: false,
     ...featureDefaults(),
     createdAt: now,
     savedAt: now,
@@ -26,11 +30,11 @@ export function newGame(now: number): GameState {
     xp: 0,
     eggs: 0,
     coop: { owned: false, chickens: [], pendingEggs: 0 },
-    seeds: { ...emptyInventory(), wheat: START_WHEAT_SEEDS },
+    seeds: { ...emptyInventory(), carrot: START_WHEAT_SEEDS },
     produce: emptyInventory(),
     cells: createGrid(6),
     quests: Object.fromEntries(
       QUESTS.map(quest => [quest.id, { count: 0, status: 'active' as const }])
     )
-  }, now), now);
+  }, 0), 0));
 }

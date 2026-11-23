@@ -3,8 +3,10 @@ import { consume, itemPrice } from './inventory';
 import { hashString, mulberry32 } from './rng';
 import { isUnlocked, levelOf } from './xp';
 import type { GameState, ItemId, Order, Result } from './types';
+import { inSeason, dayKey } from './seasons';
 export function unlockedItems(state: GameState): ItemId[] {
-  const items: ItemId[] = CROP_IDS.filter(id => isUnlocked(id, state.xp));
+  const items: ItemId[] = CROP_IDS.filter(id => isUnlocked(id, state.xp) && (inSeason(id, state.season) || state.produce[id] > 0));
+  if (!items.length) items.push('carrot');
   if (state.coop.owned) items.push('eggs');
   if (state.buildings.mill.owned) items.push('flour');
   if (state.buildings.mill.owned && state.buildings.bakery.owned) {
@@ -15,7 +17,7 @@ export function unlockedItems(state: GameState): ItemId[] {
   return items;
 }
 export function generate(state: GameState, slot: number, generation: number): Order {
-  const id = `${state.createdAt}:${slot}:${generation}`;
+  const id = `${state.createdAt}:${dayKey(state)}:${slot}:${generation}`;
   const rng = mulberry32(hashString(id));
   const pool = unlockedItems(state);
   const count = Math.min(pool.length, 1 + Math.floor(rng() * 3));
@@ -31,14 +33,14 @@ export function generate(state: GameState, slot: number, generation: number): Or
 export function refill(state: GameState, now: number): GameState {
   let changed = false;
   const orders = state.orders.map((slot, i) => {
-    if (slot.order || now < slot.refillAt) return slot;
+    if (slot.order || state.elapsedMinutes < slot.refillAt) return slot;
     changed = true;
     return { ...slot, order: generate(state, i, slot.generation) };
   });
   return changed ? { ...state, orders } : state;
 }
 function finish(state: GameState, index: number, now: number): GameState {
-  return { ...state, orders: state.orders.map((slot, i) => i === index ? { order: null, generation: slot.generation + 1, refillAt: Math.max(now, state.savedAt) + 120_000 } : slot) };
+  return { ...state, orders: state.orders.map((slot, i) => i === index ? { order: null, generation: slot.generation + 1, refillAt: state.elapsedMinutes + 1560 - state.minute } : slot) };
 }
 export function deliver(state: GameState, index: number, now: number): Result {
   const order = state.orders[index]?.order;

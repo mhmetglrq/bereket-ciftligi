@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buyCoop, buyChicken, feed, feedAll, collectEgg, settleCoop } from '../../src/sim/coop';
+import { endDay } from '../../src/sim/dayEnd';
 import { applyAction } from '../../src/sim/actions';
-import { COOP_COST, CHICKEN_COST, MAX_CHICKENS, EGG_MS, EGG_PRICE } from '../../src/sim/data';
+import { COOP_COST, CHICKEN_COST, MAX_CHICKENS, EGG_PRICE } from '../../src/sim/data';
 import { newGame } from '../../src/sim/grid';
 import type { GameState } from '../../src/sim/types';
 
@@ -107,7 +108,7 @@ describe('Coop & Chicken simulation', () => {
     if (!noWheatRes.ok) expect(noWheatRes.reason).toBe('noWheat');
   });
 
-  it('a fed chicken lays 1 egg after 60s and becomes hungry again', () => {
+  it('a fed chicken lays 1 egg at day end and becomes hungry again', () => {
     const state: GameState = {
       ...gameWithCoop(500, 2),
       coop: {
@@ -118,12 +119,12 @@ describe('Coop & Chicken simulation', () => {
     };
 
     // Before 60s
-    const before60s = settleCoop(state, now + EGG_MS - 1);
+    const before60s = settleCoop(state, now + 10000);
     expect(before60s.coop.pendingEggs).toBe(0);
     expect(before60s.coop.chickens[0].fedAt).toBe(now);
 
     // At 60s
-    const at60s = settleCoop(state, now + EGG_MS);
+    const at60s = endDay(state).state;
     expect(at60s.coop.pendingEggs).toBe(1);
     expect(at60s.coop.chickens[0].fedAt).toBeNull(); // Hungry again
   });

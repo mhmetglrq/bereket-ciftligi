@@ -49,7 +49,7 @@ export class SaveStorage {
     return this.backends[this.index].get(key);
   }
 
-  async protectLegacy(raw: string, version: 1 | 2): Promise<void> {
+  async protectLegacy(raw: string, version: 1 | 2 | 3): Promise<void> {
     this.legacyRaw = raw;
     this.legacyVersion = version;
     await this.ensureBackup();
@@ -58,7 +58,7 @@ export class SaveStorage {
   private async ensureBackup(): Promise<void> {
     if (this.legacyRaw === null || this.protectedBackends.has(this.index)) return;
     const backend = this.backends[this.index];
-    const key = `${SAVE_KEY}:backup:pre-v3`;
+    const key = `${SAVE_KEY}:backup:pre-v4`;
     if (await backend.get(key) === null) await backend.set(key, this.legacyRaw);
     if (this.legacyVersion === 1 && await backend.get(`${SAVE_KEY}:backup:v1`) === null) await backend.set(`${SAVE_KEY}:backup:v1`, this.legacyRaw);
     this.protectedBackends.add(this.index);
@@ -86,9 +86,6 @@ export class SaveStorage {
   async finishMigration(): Promise<void> {
     if (this.legacyRaw === null) return;
     this.legacyRaw = null;
-    for (const index of this.protectedBackends) {
-      try { await this.backends[index].remove(`${SAVE_KEY}:backup:pre-v3`); } catch { /* A retained backup is safe. */ }
-    }
     this.protectedBackends.clear();
   }
 }
@@ -122,17 +119,19 @@ export async function loadGame(storage: SaveStorage, now: number): Promise<LoadR
   if (decoded.kind === 'ok') {
     const original: unknown = JSON.parse(raw);
     if (typeof original === 'object' && original !== null &&
-      'version' in original && (original.version === 1 || original.version === 2)) {
+      'version' in original && (original.version === 1 || original.version === 2 || original.version === 3)) {
       try {
         await storage.protectLegacy(raw, original.version);
       } catch {
         return { state: decoded.state, notice: 'migrationBackupFailed', readonly: true };
       }
     }
-    return { state: refill(decoded.state, now), notice: null, readonly: false };
+    return { state: decoded.state, notice: null, readonly: false };
   }
   if (decoded.kind === 'future') {
-    return { state: newGame(now), notice: 'future', readonly: true };
+    try { await storage.write(raw, `${SAVE_KEY}:unknown:${now}`); }
+    catch { return { state: newGame(now), notice: 'corruptBackupFailed', readonly: true }; }
+    return { state: newGame(now), notice: 'corrupt', readonly: false };
   }
   try {
     await storage.write(raw, `${SAVE_KEY}:corrupt:${now}`);

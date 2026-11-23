@@ -1,11 +1,12 @@
-import { isRipe, isWatered, waterOverlap } from './crops';
+import { isRipe } from './crops';
 import { CROPS } from './data';
 import { buyExpansion, buySeed, sell, sellEgg } from './economy';
-import { buyChicken, buyCoop, collectEgg, feed, feedAll, settleCoop } from './coop';
+import { buyChicken, buyCoop, collectEgg, feed, feedAll } from './coop';
 import { applyQuestEvents, claimQuest } from './quests';
 import { rescue } from './rescue';
 import { isUnlocked, xpFor } from './xp';
-import { advanceOffline } from './offline';
+import { inSeason } from './seasons';
+import { eat, buyFood } from './energy';
 import { sellItem } from './economy';
 import * as production from './production';
 import * as orders from './orders';
@@ -23,16 +24,20 @@ export function till(state: GameState, cellId: string): Result {
   const cell = state.cells.find(item => item.id === cellId);
   if (!cell) return { ok: false, reason: 'missingCell' };
   if (cell.kind === 'tree') return { ok: false, reason: 'treeOccupied' };
+  if (cell.dead) return { ok: true, state: replace(state, { id: cell.id, x: cell.x, y: cell.y, kind: 'untilled' }), events: [] };
   if (cell.kind !== 'untilled') return { ok: false, reason: 'alreadyTilled' };
+  if (state.energy < 2) return { ok: false, reason: 'noEnergy' };
   return {
     ok: true,
-    state: replace(state, { ...cell, kind: 'tilled' }),
+    state: { ...replace(state, { ...cell, kind: 'tilled', wateredToday: state.weather === 'rain' }), energy: state.energy - 2 },
     events: [{ type: 'till', amount: 1 }]
   };
 }
 
 export function plant(state: GameState, cellId: string, cropId: CropId, now: number): Result {
   if (!isUnlocked(cropId, state.xp)) return { ok: false, reason: 'locked' };
+  if (state.season === 'winter') return { ok: false, reason: 'winter' };
+  if (!inSeason(cropId, state.season)) return { ok: false, reason: 'wrongSeason' };
   const cell = state.cells.find(item => item.id === cellId);
   if (!cell) return { ok: false, reason: 'missingCell' };
   if (cell.kind === 'untilled') return { ok: false, reason: 'needTill' };
@@ -42,7 +47,7 @@ export function plant(state: GameState, cellId: string, cropId: CropId, now: num
   return {
     ok: true,
     state: {
-      ...replace(state, { ...cell, kind: 'planted', cropId, plantedAt: now }),
+      ...replace(state, { ...cell, kind: 'planted', cropId, plantedAt: now, daysRemaining: CROPS[cropId].days, growthDays: CROPS[cropId].days, wateredToday: cell.wateredToday || state.weather === 'rain' }),
       seeds: { ...state.seeds, [cropId]: state.seeds[cropId] - 1 }
     },
     events: [{ type: 'plant', cropId, amount: 1 }]
@@ -58,7 +63,7 @@ export function harvest(state: GameState, cellId: string, now: number): Result {
   return {
     ok: true,
     state: {
-      ...replace(state, { id: cell.id, x: cell.x, y: cell.y, kind: 'tilled' }),
+      ...replace(state, CROPS[cell.cropId].regrow ? { ...cell, daysRemaining: CROPS[cell.cropId].regrow, growthDays: CROPS[cell.cropId].regrow } : { id: cell.id, x: cell.x, y: cell.y, kind: 'tilled', wateredToday: cell.wateredToday }),
       produce: { ...state.produce, [cell.cropId]: state.produce[cell.cropId] + 1 }
     },
     events: [{ type: 'harvest', cropId: cell.cropId, amount: 1 }]
@@ -67,29 +72,26 @@ export function harvest(state: GameState, cellId: string, now: number): Result {
 
 export function water(state: GameState, cellId: string, now: number): Result {
   const cell = state.cells.find(item => item.id === cellId);
+  if (cell?.wateredToday) return { ok: false, reason: 'alreadyWatered' };
   if (cell?.kind === 'tree') return { ok: false, reason: 'treeOccupied' };
-  if (!cell || cell.kind !== 'planted' || isRipe(cell, now) || isWatered(cell, now)) {
+  if (!cell || (cell.kind !== 'planted' && cell.kind !== 'tilled') || cell.dead) {
     return { ok: false, reason: 'notApplicable' };
   }
-  // Fold the previous, expired bonus into the planting timestamp exactly once.
-  if (cell.water && now < cell.water.at) return { ok: false, reason: 'notApplicable' };
-  const plantedAt = cell.plantedAt - (cell.water ? waterOverlap(cell.water, now) * 0.5 : 0);
+  if (state.energy < 2) return { ok: false, reason: 'noEnergy' };
   return {
     ok: true,
-    state: replace(state, {
-      ...cell,
-      plantedAt,
-      water: { at: now, until: now + CROPS[cell.cropId].growMs / 4 / 1.5 }
-    }),
-    events: [{ type: 'water', cropId: cell.cropId, amount: 1 }]
+    state: { ...replace(state, { ...cell, wateredToday: true }), energy: state.energy - 2 },
+    events: [{ type: 'water', amount: 1 }]
   };
 }
 
 export function applyAction(state: GameState, action: Action, now: number): Result {
-  state = now < state.savedAt ? advanceOffline(state, now).state : settleCoop(state, now);
+  now = state.elapsedMinutes;
   state = daily.rollDailyQuests(orders.refill(production.advance(state, now), now), now);
   let result: Result;
   switch (action.type) {
+    case 'eat': result = eat(state, action.itemId); break;
+    case 'buyFood': result = buyFood(state, action.itemId); break;
     case 'buyBuilding': result = production.buyBuilding(state, action.buildingId); break;
     case 'queueProduction': result = production.queue(state, action.buildingId, action.recipeId, now); break;
     case 'cancelProduction': result = production.cancel(state, action.buildingId, action.jobId, now); break;
@@ -99,7 +101,7 @@ export function applyAction(state: GameState, action: Action, now: number): Resu
     case 'sellItem': result = sellItem(state, action.itemId, action.amount); break;
     case 'deliverOrder': result = orders.deliver(state, action.slot, now); break;
     case 'rejectOrder': result = orders.reject(state, action.slot, now); break;
-    case 'claimDaily': result = daily.claimDaily(state, now); break;
+    case 'claimDaily': return { ok: false, reason: 'notApplicable' };
     case 'claimDailyQuest': result = daily.claimQuest(state, action.questId, now); break;
     case 'till': result = till(state, action.cellId); break;
     case 'plant': result = plant(state, action.cellId, action.cropId, now); break;
@@ -123,7 +125,7 @@ export function applyAction(state: GameState, action: Action, now: number): Resu
   }, result.events), result.events, now));
   return {
     ok: true,
-    state: { ...checked.state, savedAt: now },
+    state: checked.state,
     events: checked.gifted ? [...result.events, { type: 'rescue', amount: 5 }] : result.events
   };
 }

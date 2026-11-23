@@ -1,11 +1,15 @@
 import type { StateCreator } from 'zustand';
-import type { CropId, Tool } from '../../sim/types';
-import type { AwayReport } from '../../sim/offline';
+import type { CropId, Tool, Layout } from '../../sim/types';
+import type { Shipment } from '../../sim/shipping';
 import type { StorageMode } from '../../save/storage';
 import { tr } from '../../i18n/tr';
 import type { Store } from '../game';
 
-export type Panel = 'market' | 'quests' | 'settings' | 'pause' | 'field' | 'reset' | 'coop' | 'mill' | 'bakery' | 'orders' | 'daily' | null;
+export type Panel = 'home' | 'shipping' | 'market' | 'quests' | 'settings' | 'pause' | 'field' | 'reset' | 'coop' | 'mill' | 'bakery' | 'orders' | 'daily' | null;
+export type QueuedModal = { type: 'passOut'; penalty: number } | { type: 'shipment'; shipment: Shipment } | { type: 'intro' } | { type: 'daily' };
+export function overnightQueue(penalty: number | null, shipment: Shipment, intro: boolean, daily: boolean): QueuedModal[] {
+  return [...(penalty !== null ? [{ type: 'passOut' as const, penalty }] : []), ...(shipment.total > 0 ? [{ type: 'shipment' as const, shipment }] : []), ...(intro ? [{ type: 'intro' as const }] : []), ...(daily ? [{ type: 'daily' as const }] : [])];
+}
 export interface Feedback {
   id: number;
   text: string;
@@ -23,7 +27,16 @@ export interface UISlice {
   selected: string | null;
   painting: boolean;
   paintedCell: string | null;
-  away: AwayReport | null;
+  editMode: boolean;
+  isDragging: boolean;
+  hidden: boolean;
+  blurred: boolean;
+  hoveredObject: string | null;
+  selectedObject: string | null;
+  layoutSnapshot: Layout | null;
+  savedTool: Tool | null;
+  modalQueue: QueuedModal[];
+  closeQueuedModal: () => void;
   toasts: Feedback[];
   floaters: Feedback[];
   shake: number;
@@ -48,15 +61,22 @@ export function feedback(text: string, now: number, duration = 3000): Feedback {
 }
 
 export const createUISlice: StateCreator<Store, [], [], UISlice> = (set, get) => ({
-  now: Date.now(),
+  now: 0,
   phase: 'loading',
   panel: null,
   tool: null,
-  seed: 'wheat',
+  seed: 'carrot',
   selected: null,
   painting: false,
   paintedCell: null,
-  away: null,
+  editMode: false, isDragging: false, hidden: false, blurred: false,
+  hoveredObject: null, selectedObject: null, layoutSnapshot: null, savedTool: null, modalQueue: [],
+  closeQueuedModal: () => {
+    const current = get();
+    const game = current.modalQueue[0]?.type === 'intro' ? { ...current.game, seenV4Intro: true } : current.game;
+    set({ game, modalQueue: current.modalQueue.slice(1) });
+    current.requestSave();
+  },
   toasts: [],
   floaters: [],
   shake: 0,
@@ -73,7 +93,7 @@ export const createUISlice: StateCreator<Store, [], [], UISlice> = (set, get) =>
     panel,
     floaters: panel ? state.floaters.filter(item => item.id !== WARNING_ID) : state.floaters
   })),
-  chooseTool: tool => set({ tool: get().tool === tool ? null : tool }),
+  chooseTool: tool => { if (!get().editMode) set({ tool: get().tool === tool ? null : tool }); },
   notify: (text, duration = 3000, unlocks) => set(state => {
     const now = Date.now();
     return {
@@ -88,7 +108,7 @@ export const createUISlice: StateCreator<Store, [], [], UISlice> = (set, get) =>
   }),
   warn: now => {
     const state = get();
-    if (state.panel !== null || state.away || state.conflict) return false;
+    if (state.panel !== null || state.conflict) return false;
     const repeated = state.floaters.some(item => item.id === WARNING_ID && item.expiresAt > now);
     set({
       shake: repeated ? state.shake : state.shake + 1,

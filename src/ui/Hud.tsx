@@ -1,9 +1,11 @@
 import { useGame } from '../store/game';
-import { DAY_MS } from '../sim/data';
 import { xpProgress } from '../sim/xp';
 import { tr } from '../i18n/tr';
 import { number } from '../i18n/format';
 import { canAfford } from '../sim/inventory';
+import { Clock } from './Clock';
+import { Weather } from './Weather';
+import { EnergyBar } from './EnergyBar';
 
 export function Hud() {
   const orderCount = useGame(s => s.game.orders.filter(slot => slot.order && canAfford(s.game, slot.order.items)).length);
@@ -12,16 +14,12 @@ export function Hud() {
   const size = useGame(state => state.game.gridSize);
   const quests = useGame(state => state.game.quests);
   const coopOwned = useGame(state => state.game.coop.owned);
-  const now = useGame(state => state.now);
-  const createdAt = useGame(state => state.game.createdAt);
   const mode = useGame(state => state.storageMode);
   const saveStatus = useGame(state => state.saveStatus);
   const setPanel = useGame(state => state.setPanel);
   const reduced = useGame(state => state.reducedMotion);
   const celebration = useGame(state => [...state.toasts].reverse().find(item => item.kind === 'level'));
   const count = Object.values(quests).filter(quest => quest.status === 'complete').length;
-  const phase = ((now - createdAt) % DAY_MS + DAY_MS) % DAY_MS / DAY_MS;
-  const period = phase < 0.12 ? tr.dawn : phase < 0.48 ? tr.day : phase < 0.62 ? tr.dusk : tr.night;
   const progress = xpProgress(xp);
   const label = `${tr.levelShort} ${number(progress.level)} · ${number(progress.current)}/${number(progress.required)} ${tr.xp}`;
 
@@ -47,6 +45,9 @@ export function Hud() {
           )}
         </div>
         <nav className="nav panel" aria-label={tr.title}>
+          <button onClick={() => useGame.getState().enterEdit()}>Düzenle</button>
+          <button onClick={() => setPanel('home')} aria-label="Ev · Uyu">⌂</button>
+          <button onClick={() => setPanel('shipping')} aria-label="Nakliye kutusu">📦</button>
           <button onClick={() => setPanel('orders')} aria-label={`${tr.orders} · ${number(orderCount)}`}>📋 <span>{tr.orders}</span>{orderCount > 0 && <b className="badge">{number(orderCount)}</b>}</button>
           <button onClick={() => setPanel('daily')} aria-label={tr.daily}>🎁</button>
           <button onClick={() => setPanel('market')}>🧺 <span>{tr.market}</span></button>
@@ -57,7 +58,7 @@ export function Hud() {
         </nav>
       </div>
       <div className="world-status panel">
-        <span>{phase < 0.5 ? '☀' : '☾'} {period}</span>
+        <Weather /><Clock /><EnergyBar />
         <span className="muted">{mode === 'memory' ? tr.memory : mode === 'idb' ? tr.fallback : tr[saveStatus]}</span>
       </div>
     </header>

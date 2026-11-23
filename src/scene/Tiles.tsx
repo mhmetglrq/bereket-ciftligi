@@ -4,6 +4,7 @@ import { useGame } from '../store/game';
 import { isWatered } from '../sim/crops';
 import type { Assets } from './assets';
 import { palette } from './palette';
+import { cellPosition } from '../sim/layout';
 
 export interface Instance {
   x: number;
@@ -48,12 +49,15 @@ export function Batch({ assetId, items, assets, castShadow = true }: {
 }
 
 export function Tiles({ assets }: { assets: Assets }) {
+  const layout = useGame(state => state.game.layout);
   const cells = useGame(state => state.game.cells);
   const now = useGame(state => state.now);
   const grass: Instance[] = [];
   const soil: Instance[] = [];
   const furrows: Instance[] = [];
-  cells.forEach(cell => {
+  cells.forEach(original => {
+    const position = cellPosition(original, layout);
+    const cell = { ...original, x: position.x, y: position.y };
     if (cell.kind === 'untilled' || cell.kind === 'tree') {
       grass.push({ x: cell.x, y: 0, z: cell.y });
     } else {

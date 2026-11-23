@@ -1,4 +1,5 @@
 import { MAX_CHICKENS } from './data';
+import { dayKey } from './seasons';
 import { hashString, mulberry32 } from './rng';
 import type { DailyQuest, GameEvent, GameState, Result } from './types';
 export function localDateKey(now: number): string {
@@ -12,8 +13,8 @@ export function nextRewardDay(state: GameState, now: number): number {
 }
 export const DAILY_REWARDS = [25, 40, 60, 80, 100, 125, 150] as const;
 export function rollDailyQuests(state: GameState, now: number): GameState {
-  const date = localDateKey(now);
-  if (state.daily.date >= date) return state;
+  const date = dayKey(state);
+  if (state.daily.date === date) return state;
   const rng = mulberry32(hashString(date));
   const pool: DailyQuest['event'][] = ['till', 'plant', 'harvest', 'water', 'sell'];
   const quests: DailyQuest[] = Array.from({ length: 3 }, (_, i) => {
@@ -25,7 +26,7 @@ export function rollDailyQuests(state: GameState, now: number): GameState {
 }
 export function claimDaily(state: GameState, now: number): Result {
   const date = localDateKey(now);
-  if (date < state.daily.date || state.daily.lastClaim && state.daily.lastClaim >= date) return { ok: false, reason: 'dailyClaimed' };
+  if (state.daily.lastClaim && state.daily.lastClaim >= date) return { ok: false, reason: 'dailyClaimed' };
   const streak = nextRewardDay(state, now);
   const chicken = streak === 7 && state.coop.owned && state.coop.chickens.length < MAX_CHICKENS;
   return { ok: true, state: {
@@ -37,12 +38,12 @@ export function claimDaily(state: GameState, now: number): Result {
 }
 export function track(state: GameState, events: GameEvent[], now: number): GameState {
   state = rollDailyQuests(state, now);
-  if (state.daily.date !== localDateKey(now)) return state;
+  if (state.daily.date !== dayKey(state)) return state;
   return { ...state, daily: { ...state.daily, quests: state.daily.quests.map(q => q.claimed ? q : { ...q, count: Math.min(q.target, q.count + events.filter(e => e.type === q.event).reduce((n, e) => n + e.amount, 0)) }) } };
 }
 export function claimQuest(state: GameState, id: string, now: number): Result {
   state = rollDailyQuests(state, now);
   const quest = state.daily.quests.find(q => q.id === id);
-  if (state.daily.date !== localDateKey(now) || !quest || quest.claimed || quest.count < quest.target) return { ok: false, reason: 'questNotReady' };
+  if (state.daily.date !== dayKey(state) || !quest || quest.claimed || quest.count < quest.target) return { ok: false, reason: 'questNotReady' };
   return { ok: true, state: { ...state, gold: state.gold + quest.gold, xp: state.xp + quest.xp, daily: { ...state.daily, quests: state.daily.quests.map(q => q.id === id ? { ...q, claimed: true } : q) } }, events: [{ type: 'daily', amount: 1 }] };
 }

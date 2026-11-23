@@ -38,11 +38,12 @@ export function ResetConfirmation() {
     const now = Date.now();
     useGame.setState({
       game: newGame(now),
-      now,
+      now: 0,
+      seed: 'carrot', editMode: false, isDragging: false, layoutSnapshot: null, savedTool: null,
+      modalQueue: [{ type: 'intro' }],
       selected: null,
       tool: null,
       panel: null,
-      away: null,
       floaters: [],
       ripeIds: [],
       sceneEpoch: current.sceneEpoch + 1

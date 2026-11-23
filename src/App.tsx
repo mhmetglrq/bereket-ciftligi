@@ -11,7 +11,9 @@ import { Market } from './ui/Market';
 import { CoopPanel } from './ui/CoopPanel';
 import { Quests } from './ui/Quests';
 import { Settings, ResetConfirmation } from './ui/Settings';
-import { AwaySummary } from './ui/AwaySummary';
+import { EditBar } from './ui/EditBar';
+import { ModalHost } from './ui/ModalHost';
+import { ShippingBin } from './ui/ShippingBin';
 import { TitleScreen } from './ui/TitleScreen';
 import { PauseMenu } from './ui/PauseMenu';
 import { FieldList } from './ui/FieldList';
@@ -26,7 +28,8 @@ import { DailyReward } from './ui/DailyReward';
 export default function App() {
   const phase = useGame(state => state.phase);
   const panel = useGame(state => state.panel);
-  const away = useGame(state => state.away);
+  const editing = useGame(state => state.editMode);
+  const queued = useGame(state => state.modalQueue.length > 0);
   const reduced = useGame(state => state.reducedMotion);
   const conflict = useGame(state => state.conflict);
 
@@ -48,7 +51,7 @@ export default function App() {
       useGame.setState({ reducedMotion: event.matches });
     const pause = (): void => {
       const state = useGame.getState();
-      if (state.phase === 'playing' && !state.panel && !state.away) state.setPanel('pause');
+      if (state.phase === 'playing' && !state.panel && !state.modalQueue.length && !state.editMode) state.setPanel('pause');
     };
     const visibility = (): void => {
       if (document.visibilityState === 'hidden') pause();
@@ -75,24 +78,20 @@ export default function App() {
         <FarmScene />
         {phase !== 'playing' ? <TitleScreen /> : (
           <div className="overlay">
-            <Hud />
-            <CellInfo />
-            <Toolbar />
+            {editing ? <EditBar /> : <><Hud /><CellInfo /><Toolbar /></>}
           </div>
         )}
       </div>
       <TabConflict />
       <Toasts />
       {phase === 'playing' && !conflict && (
-        away ? (
-          <Modal key="away" title={tr.away} onClose={() => useGame.setState({ away: null })}>
-            <AwaySummary />
-          </Modal>
-        ) : panel ? (
+        queued ? <ModalHost /> : panel ? (
           <Modal key={panel} title={title} onClose={close}>
             {(panel === 'mill' || panel === 'bakery') && <BuildingPanel id={panel} />}
             {panel === 'orders' && <OrderBoard />}
             {panel === 'daily' && <DailyReward />}
+            {panel === 'shipping' && <ShippingBin />}
+            {panel === 'home' && <div className="feature-content"><p>Uyuyarak günü bitir ve enerjini yenile.</p><button className="primary" onClick={() => useGame.getState().sleep()}>Uyu</button></div>}
             {panel === 'market' && <Market />}
             {panel === 'coop' && <CoopPanel />}
             {panel === 'quests' && <Quests />}

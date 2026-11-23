@@ -7,6 +7,7 @@ import { useGame } from '../store/game';
 import type { Assets } from './assets';
 import { Batch, type Instance } from './Tiles';
 import { palette } from './palette';
+import { cellPosition } from '../sim/layout';
 
 function RipeMarkers({ items }: { items: Instance[] }) {
   const ref = useRef<Group>(null);
@@ -29,6 +30,7 @@ function RipeMarkers({ items }: { items: Instance[] }) {
 }
 
 export function Crops({ assets }: { assets: Assets }) {
+  const layout = useGame(state => state.game.layout);
   const cells = useGame(state => state.game.cells);
   const now = useGame(state => state.now);
   const groups = new Map<string, Instance[]>();
@@ -37,7 +39,8 @@ export function Crops({ assets }: { assets: Assets }) {
   CROP_IDS.forEach(id => {
     for (let stage = 0; stage < 4; stage++) groups.set(`crop.${id}.stage${stage}`, []);
   });
-  cells.forEach(cell => {
+  cells.forEach(original => {
+    const cell = { ...original, ...cellPosition(original, layout) };
     if (cell.kind !== 'planted') return;
     const stage = stageOf(cell, now);
     const instances = groups.get(`crop.${cell.cropId}.stage${stage}`)!;
@@ -48,7 +51,8 @@ export function Crops({ assets }: { assets: Assets }) {
         x: cell.x + offset,
         y: height,
         z: cell.y + (index % 2 === 0 ? -0.16 : 0.16),
-        rotation: cell.cropId === 'carrot' && stage === 3 ? Math.PI : index * 0.7
+        rotation: cell.cropId === 'carrot' && stage === 3 ? Math.PI : index * 0.7,
+        color: cell.dead ? '#6b5740' : cell.cropId === 'pumpkin' && stage === 3 ? '#c26720' : undefined
       });
     });
     if (isRipe(cell, now)) ripe.push({ x: cell.x, y: 1, z: cell.y });

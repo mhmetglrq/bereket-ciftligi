@@ -14,6 +14,10 @@ import { Tiles } from './Tiles';
 import { tr } from '../i18n/tr';
 import { Buildings } from './Buildings';
 import { Trees } from './Trees';
+import { stepDriver } from '../store/driver';
+import { EditLayer } from './EditLayer';
+import { EditLayerBoundary } from './EditLayerBoundary';
+import { SceneLabels } from './SceneLabels';
 
 declare global {
   interface Window {
@@ -41,6 +45,7 @@ function World() {
       maxCalls: Math.max(previous, gl.info.render.calls)
     };
   });
+  useFrame((_, delta) => stepDriver(delta));
   return (
     <>
       <CameraRig />
@@ -54,6 +59,8 @@ function World() {
       <Trees assets={assets} />
       <Selection />
       <Decor />
+      <EditLayerBoundary><EditLayer /></EditLayerBoundary>
+      <SceneLabels />
     </>
   );
 }

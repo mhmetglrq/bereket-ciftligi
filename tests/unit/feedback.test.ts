@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createStore, type StoreApi } from 'zustand';
 import { createUISlice, WARNING_ID, type UISlice } from '../../src/store/slices/uiSlice';
 import type { Store } from '../../src/store/game';
+import { createGameSlice } from '../../src/store/slices/gameSlice';
 import { newGame } from '../../src/sim/grid';
 
 describe('UI Feedback & Toast constraints', () => {
@@ -10,6 +11,7 @@ describe('UI Feedback & Toast constraints', () => {
   beforeEach(() => {
     store = createStore<Store>()((set, get, api) => ({
       ...createUISlice(set, get, api),
+      ...createGameSlice(set, get, api),
       game: newGame(0),
       dispatch: () => {},
       selectCell: () => {},

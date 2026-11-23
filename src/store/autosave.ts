@@ -24,7 +24,7 @@ export function startAutosave(): () => void {
   const flush = async (): Promise<void> => {
     const current = useGame.getState();
     if (busy || current.phase === 'loading' || !current.mayWrite()) return;
-    const snapshot = current.game;
+    const snapshot = current.editMode && current.layoutSnapshot ? { ...current.game, layout: current.layoutSnapshot } : current.game;
     const snapshotRevision = revision;
     const now = Date.now();
     busy = true;

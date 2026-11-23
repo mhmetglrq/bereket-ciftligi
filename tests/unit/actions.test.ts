@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { endDay } from '../../src/sim/dayEnd';
 import { applyAction, canApply, harvest, plant, till } from '../../src/sim/actions';
 import { CROPS, emptyInventory } from '../../src/sim/data';
 import { newGame } from '../../src/sim/grid';
@@ -11,7 +12,7 @@ function stateOf(result: Result): GameState {
   return result.state;
 }
 
-function planted(cropId: CropId = 'wheat'): GameState {
+function planted(cropId: CropId = 'carrot'): GameState {
   const game = newGame(NOW);
   return stateOf(plant(stateOf(till(game, '0,0')), '0,0', cropId, NOW));
 }
@@ -37,34 +38,34 @@ describe('sim actions', () => {
   it('plants seed on tilled cell and checks seeds inventory', () => {
     const game = newGame(NOW);
     // Plant on untilled fails with needTill
-    expect(plant(game, '0,0', 'wheat', NOW)).toEqual({ ok: false, reason: 'needTill' });
+    expect(plant(game, '0,0', 'carrot', NOW)).toEqual({ ok: false, reason: 'needTill' });
 
     const tilled = stateOf(till(game, '0,0'));
     // Plant when no seeds
     const noSeedsState = { ...tilled, seeds: emptyInventory() };
-    expect(plant(noSeedsState, '0,0', 'wheat', NOW)).toEqual({ ok: false, reason: 'noSeeds' });
+    expect(plant(noSeedsState, '0,0', 'carrot', NOW)).toEqual({ ok: false, reason: 'noSeeds' });
 
     // Valid plant
-    const plantResult = plant(tilled, '0,0', 'wheat', NOW);
+    const plantResult = plant(tilled, '0,0', 'carrot', NOW);
     expect(plantResult.ok).toBe(true);
     if (!plantResult.ok) return;
-    expect(plantResult.state.seeds.wheat).toBe(game.seeds.wheat - 1);
-    expect(plantResult.state.cells[0]).toEqual({
+    expect(plantResult.state.seeds.carrot).toBe(game.seeds.carrot - 1);
+    expect(plantResult.state.cells[0]).toMatchObject({
       id: '0,0',
       x: 0,
       y: 0,
       kind: 'planted',
-      cropId: 'wheat',
+      cropId: 'carrot',
       plantedAt: NOW
     });
-    expect(plantResult.events).toEqual([{ type: 'plant', cropId: 'wheat', amount: 1 }]);
+    expect(plantResult.events).toEqual([{ type: 'plant', cropId: 'carrot', amount: 1 }]);
 
     // Occupied
-    expect(plant(plantResult.state, '0,0', 'wheat', NOW)).toEqual({ ok: false, reason: 'occupied' });
+    expect(plant(plantResult.state, '0,0', 'carrot', NOW)).toEqual({ ok: false, reason: 'occupied' });
   });
 
   it('harvests ripe crop returning cell to tilled and increments produce', () => {
-    const game = planted('wheat');
+    const game = planted('carrot');
     // Not planted
     expect(harvest(newGame(NOW), '0,0', NOW)).toEqual({ ok: false, reason: 'notPlanted' });
 
@@ -74,40 +75,42 @@ describe('sim actions', () => {
 
     // Ripe at growMs
     const ripeTime = NOW + CROPS.wheat.growMs;
-    const harvestResult = harvest(game, '0,0', ripeTime);
+    let grown = game;
+    for (let i = 0; i < CROPS.carrot.days; i++) grown = endDay({ ...grown, cells: grown.cells.map(c => ({ ...c, wateredToday: true })) }).state;
+    const harvestResult = harvest(grown, '0,0', ripeTime);
     expect(harvestResult.ok).toBe(true);
     if (!harvestResult.ok) return;
 
-    expect(harvestResult.state.cells[0]).toEqual({
+    expect(harvestResult.state.cells[0]).toMatchObject({
       id: '0,0',
       x: 0,
       y: 0,
       kind: 'tilled'
     });
-    expect(harvestResult.state.produce.wheat).toBe(1);
-    expect(harvestResult.events).toEqual([{ type: 'harvest', cropId: 'wheat', amount: 1 }]);
+    expect(harvestResult.state.produce.carrot).toBe(1);
+    expect(harvestResult.events).toEqual([{ type: 'harvest', cropId: 'carrot', amount: 1 }]);
   });
 
   it('canApply agrees with each action', () => {
     const fresh = newGame(NOW);
     const tilled = stateOf(till(fresh, '0,0'));
-    const plantWheat = stateOf(plant(tilled, '0,0', 'wheat', NOW));
+    const plantWheat = stateOf(plant(tilled, '0,0', 'carrot', NOW));
 
     const cellFresh = fresh.cells[0];
     expect(canApply('till', cellFresh, fresh, NOW)).toBe(true);
-    expect(canApply('plant', cellFresh, fresh, NOW, 'wheat')).toBe(false);
+    expect(canApply('plant', cellFresh, fresh, NOW, 'carrot')).toBe(false);
     expect(canApply('harvest', cellFresh, fresh, NOW)).toBe(false);
 
     const cellTilled = tilled.cells[0];
     expect(canApply('till', cellTilled, tilled, NOW)).toBe(false);
-    expect(canApply('plant', cellTilled, tilled, NOW, 'wheat')).toBe(true);
+    expect(canApply('plant', cellTilled, tilled, NOW, 'carrot')).toBe(true);
     expect(canApply('harvest', cellTilled, tilled, NOW)).toBe(false);
 
     const cellPlanted = plantWheat.cells[0];
     expect(canApply('till', cellPlanted, plantWheat, NOW)).toBe(false);
-    expect(canApply('plant', cellPlanted, plantWheat, NOW, 'wheat')).toBe(false);
+    expect(canApply('plant', cellPlanted, plantWheat, NOW, 'carrot')).toBe(false);
     expect(canApply('harvest', cellPlanted, plantWheat, NOW)).toBe(false);
-    expect(canApply('harvest', cellPlanted, plantWheat, NOW + CROPS.wheat.growMs)).toBe(true);
+    expect(canApply('harvest', cellPlanted, plantWheat, NOW + CROPS.wheat.growMs)).toBe(false);
   });
 
   it('applyAction dispatches all action types and appends rescue gift if triggered', () => {

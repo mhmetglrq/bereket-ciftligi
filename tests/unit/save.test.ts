@@ -23,7 +23,7 @@ describe('Save System: Serialization & Schema', () => {
   it('migrates valid schema fixtures and detects future or corrupt versions', () => {
     const validFixture = newGame(NOW);
     expect(migrate(validFixture)).toEqual({ kind: 'ok', state: validFixture });
-    expect(migrate({ version: 4, gold: 100 })).toEqual({ kind: 'future' });
+    expect(migrate({ version: 5, gold: 100 })).toEqual({ kind: 'future' });
     expect(migrate({ version: 99 })).toEqual({ kind: 'future' });
     expect(migrate({ version: 0 })).toEqual({ kind: 'corrupt' });
     expect(migrate({ version: -1 })).toEqual({ kind: 'corrupt' });
@@ -60,13 +60,13 @@ describe('Save Storage & Fallback Mechanism', () => {
     }
   });
 
-  it('handles future saves without overwriting and marks session readonly', async () => {
+  it('handles future saves without overwriting and backs up unknown versions', async () => {
     const local = memoryBackend();
     const futureSave = '{"version":5,"feature":"space-farm"}';
     await local.set(SAVE_KEY, futureSave);
     const result = await loadGame(new SaveStorage([local, memoryBackend(), memoryBackend()]), NOW);
-    expect(result.readonly).toBe(true);
-    expect(result.notice).toBe('future');
+    expect(result.readonly).toBe(false);
+    expect(result.notice).toBe('corrupt');
     expect(await local.get(SAVE_KEY)).toBe(futureSave);
   });
 

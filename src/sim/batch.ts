@@ -7,7 +7,7 @@ export function applyBatch(state: GameState, tool: Tool, cellIds: string[], now:
     if (!cell || (cell.kind === 'tree' && tool !== 'harvest')) continue;
     const result = applyAction(state, tool === 'plant' ? { type: tool, cellId, cropId } : { type: tool, cellId }, now);
     if (!result.ok) {
-      if (result.reason === 'noSeeds' || result.reason === 'locked') return { state, events, stoppedReason: result.reason };
+      if (['noSeeds', 'locked', 'noEnergy', 'winter', 'wrongSeason'].includes(result.reason)) return { state, events, stoppedReason: result.reason };
       continue;
     }
     state = result.state; events.push(...result.events);

@@ -1,4 +1,7 @@
-export type CropId = 'wheat' | 'carrot' | 'tomato' | 'corn' | 'strawberry';
+export type CropId = 'wheat' | 'carrot' | 'tomato' | 'corn' | 'strawberry' | 'pumpkin';
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+export interface LayoutObject { id: string; x: number; y: number; width: number; height: number }
+export type Layout = LayoutObject[];
 export type Tool = 'till' | 'plant' | 'harvest' | 'water';
 export type Inventory = Record<CropId, number>;
 export type GoodId = 'flour' | 'bread' | 'cake' | 'apple' | 'cherry';
@@ -13,17 +16,27 @@ export interface OrderSlot { order: Order | null; refillAt: number; generation: 
 export interface DailyQuest { id: string; event: GameEvent['type']; target: number; count: number; claimed: boolean; gold: number; xp: number }
 export interface DailyState { lastClaim: string | null; streak: number; date: string; quests: DailyQuest[] }
 export interface Water { at: number; until: number }
-export type Cell =
+export type Cell = { wateredToday?: boolean; dead?: boolean; growthDays?: number; daysRemaining?: number; ageDays?: number; fruitReady?: boolean } & (
   | { id: string; x: number; y: number; kind: 'untilled' | 'tilled' }
   | { id: string; x: number; y: number; kind: 'planted'; cropId: CropId; plantedAt: number; water?: Water }
-  | { id: string; x: number; y: number; kind: 'tree'; treeId: TreeId; plantedAt: number; ripeAt: number; harvested: boolean };
+  | { id: string; x: number; y: number; kind: 'tree'; treeId: TreeId; plantedAt: number; ripeAt: number; harvested: boolean });
 
 export interface Chicken { id: string; fedAt: number | null }
 export interface CoopState { owned: boolean; chickens: Chicken[]; pendingEggs: number }
 export type QuestStatus = 'active' | 'complete' | 'claimed';
 export interface QuestProgress { count: number; status: QuestStatus }
 export interface GameState {
-  version: 3;
+  version: 4;
+  day: number;
+  season: Season;
+  year: number;
+  minute: number;
+  elapsedMinutes: number;
+  energy: number;
+  weather: 'sunny' | 'rain';
+  layout: Layout;
+  shipping: Partial<Record<ItemId, number>>;
+  seenV4Intro: boolean;
   goods: Record<GoodId, number>;
   buildings: Record<BuildingId, Building>;
   orders: OrderSlot[];
@@ -47,6 +60,7 @@ export interface GameEvent {
   amount: number;
 }
 export type Reason =
+  | 'noEnergy' | 'alreadyWatered' | 'winter' | 'wrongSeason'
   | 'missingCell' | 'alreadyTilled' | 'needTill' | 'occupied' | 'noSeeds'
   | 'notPlanted' | 'notRipe' | 'noProduce' | 'notEnoughGold'
   | 'alreadyExpanded' | 'questNotReady' | 'invalidAmount' | 'notApplicable'
@@ -56,6 +70,7 @@ export type Result =
   | { ok: true; state: GameState; events: GameEvent[] }
   | { ok: false; reason: Reason };
 export type Action =
+  | { type: 'eat' | 'buyFood'; itemId: 'bread' | 'cake' }
   | { type: 'buyBuilding' | 'collectProduction'; buildingId: BuildingId }
   | { type: 'queueProduction'; buildingId: BuildingId; recipeId: RecipeId }
   | { type: 'cancelProduction'; buildingId: BuildingId; jobId: string }
