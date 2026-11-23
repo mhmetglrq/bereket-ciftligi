@@ -1,6 +1,7 @@
 import { AUTOSAVE_MS, SAVE_DEBOUNCE_MS } from '../sim/data';
 import { saveGame } from '../save/storage';
 import { getStorage, useGame } from './game';
+import { tr } from '../i18n/tr';
 
 export class SaveSchedule {
   private due: number | null = null;
@@ -37,6 +38,11 @@ export function startAutosave(): () => void {
         });
       }
       if (revision !== snapshotRevision) schedule.request(Date.now());
+    } catch {
+      if (!disposed) {
+        useGame.setState({ readonly: true });
+        useGame.getState().notify(tr.saveFailed);
+      }
     } finally {
       busy = false;
     }

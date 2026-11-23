@@ -13,7 +13,7 @@ const broken = (): Backend => ({
 });
 
 describe('schema and serialization', () => {
-  it('round trips deeply equal and accepts a v1 fixture', () => {
+  it('round trips deeply equal and accepts the current fixture', () => {
     const fixture = newGame(NOW);
     expect(deserialize(serialize(fixture))).toEqual({ kind: 'ok', state: fixture });
     expect(migrate(JSON.parse(JSON.stringify(fixture)))).toEqual({ kind: 'ok', state: fixture });
@@ -35,7 +35,7 @@ describe('schema and serialization', () => {
   it('does not invent migrations for unknown or unversioned schemas', () => {
     expect(migrate({ version: 0 }).kind).toBe('corrupt');
     expect(migrate({}).kind).toBe('corrupt');
-    expect(migrate({ version: 2 }).kind).toBe('future');
+    expect(migrate({ version: 3 }).kind).toBe('future');
   });
 });
 

@@ -29,7 +29,6 @@ describe('grid and actions', () => {
     expect(game.cells.every(cell => cell.kind === 'untilled')).toBe(true);
     expect(new Set(game.cells.map(cell => cell.id)).size).toBe(36);
   });
-
   it('rejects invalid changes without mutating input', () => {
     const game = newGame(NOW);
     const original = structuredClone(game);
@@ -42,7 +41,6 @@ describe('grid and actions', () => {
     expect(plant({ ...tilled, seeds: emptyInventory() }, '0,0', 'wheat', NOW))
       .toEqual({ ok: false, reason: 'noSeeds' });
   });
-
   it('plants, grows, harvests and returns to tilled', () => {
     const game = planted();
     expect(game.seeds.wheat).toBe(4);
@@ -52,15 +50,12 @@ describe('grid and actions', () => {
     expect(result.cells[0]).toEqual({ id: '0,0', x: 0, y: 0, kind: 'tilled' });
     expect(result.produce.wheat).toBe(1);
   });
-
   it('canApply agrees with each action', () => {
     for (const game of [newGame(NOW), stateOf(till(newGame(NOW), '0,0')), planted()]) {
       const cell = game.cells[0];
       expect(canApply('till', cell, game, NOW)).toBe(till(game, cell.id).ok);
-      expect(canApply('plant', cell, game, NOW, 'wheat'))
-        .toBe(plant(game, cell.id, 'wheat', NOW).ok);
-      expect(canApply('harvest', cell, game, NOW + 30_000))
-        .toBe(harvest(game, cell.id, NOW + 30_000).ok);
+      expect(canApply('plant', cell, game, NOW, 'wheat')).toBe(plant(game, cell.id, 'wheat', NOW).ok);
+      expect(canApply('harvest', cell, game, NOW + 30_000)).toBe(harvest(game, cell.id, NOW + 30_000).ok);
     }
   });
 });
@@ -81,7 +76,7 @@ describe('growth', () => {
 
 describe('economy', () => {
   it('sells one and all, and rejects absent produce', () => {
-    const game = { ...newGame(NOW), produce: { wheat: 4, carrot: 0, tomato: 0 } };
+    const game = { ...newGame(NOW), produce: { ...emptyInventory(), wheat: 4 } };
     const one = stateOf(sell(game, 'wheat', 1));
     expect(one.gold).toBe(58);
     expect(one.produce.wheat).toBe(3);
@@ -91,7 +86,6 @@ describe('economy', () => {
     expect(sell(all, 'wheat', 'all')).toEqual({ ok: false, reason: 'noProduce' });
     expect(sell(game, 'wheat', -1)).toEqual({ ok: false, reason: 'invalidAmount' });
   });
-
   it('buys one or five seeds at the configured cost', () => {
     const one = stateOf(buySeed(newGame(NOW), 'carrot', 1));
     expect(one.gold).toBe(40);
@@ -102,7 +96,6 @@ describe('economy', () => {
     expect(buySeed(newGame(NOW), 'tomato', 5)).toEqual({ ok: false, reason: 'notEnoughGold' });
     expect(buySeed(newGame(NOW), 'wheat', 2)).toEqual({ ok: false, reason: 'invalidAmount' });
   });
-
   it('expands without moving or changing existing cells', () => {
     expect(buyExpansion(newGame(NOW))).toEqual({ ok: false, reason: 'notEnoughGold' });
     const before = { ...planted(), gold: 1000 };
@@ -118,7 +111,7 @@ describe('economy', () => {
 
 describe('quests', () => {
   it('counts events rather than inventory and awards once', () => {
-    const game = { ...newGame(NOW), produce: { wheat: 100, carrot: 0, tomato: 0 } };
+    const game = { ...newGame(NOW), produce: { ...emptyInventory(), wheat: 100 } };
     expect(applyQuestEvents(game, []).quests.wheat10.count).toBe(0);
     const complete = applyQuestEvents(game, [{ type: 'harvest', cropId: 'wheat', amount: 10 }]);
     expect(complete.quests.wheat10.status).toBe('complete');
@@ -130,7 +123,6 @@ describe('quests', () => {
     expect(claimed.gold).toBe(game.gold + QUESTS[0].reward);
     expect(claimQuest(claimed, 'wheat10')).toEqual({ ok: false, reason: 'questNotReady' });
   });
-
   it('dispatch applies event progress to harvest and sell', () => {
     const harvested = stateOf(applyAction(planted(), { type: 'harvest', cellId: '0,0' }, NOW + 30_000));
     expect(harvested.quests.wheat10.count).toBe(1);
@@ -151,7 +143,7 @@ describe('offline', () => {
       ? { ...cell, kind: 'planted', cropId: (['wheat', 'carrot', 'tomato'] as CropId[])[index], plantedAt: NOW }
       : cell);
     const result = advanceOffline(game, NOW + 60_000);
-    expect(result.summary?.ripened).toEqual({ wheat: 1, carrot: 1, tomato: 0 });
+    expect(result.summary?.ripened).toEqual({ ...emptyInventory(), wheat: 1, carrot: 1 });
     expect(result.state.quests).toEqual(game.quests);
   });
   it('caps at seven days and rebases plantedAt', () => {
@@ -165,9 +157,7 @@ describe('offline', () => {
     const game = { ...planted(), savedAt: NOW + 10_000 };
     const result = advanceOffline(game, NOW - 5000);
     expect(result.summary).toBeNull();
-    const before = game.cells[0];
-    const after = result.state.cells[0];
-    expect(stageOf(after, NOW - 5000)).toBe(stageOf(before, game.savedAt));
+    expect(stageOf(result.state.cells[0], NOW - 5000)).toBe(stageOf(game.cells[0], game.savedAt));
     expect(result.state.seeds).toEqual(game.seeds);
   });
 });
@@ -179,7 +169,7 @@ describe('rescue', () => {
     expect(rescue(stuck).gifted).toBe(true);
     expect(rescue(newGame(NOW)).gifted).toBe(false);
     expect(rescue({ ...stuck, gold: 5 }).gifted).toBe(false);
-    expect(rescue({ ...stuck, produce: { wheat: 1, carrot: 0, tomato: 0 } }).gifted).toBe(false);
+    expect(rescue({ ...stuck, produce: { ...emptyInventory(), wheat: 1 } }).gifted).toBe(false);
     expect(rescue({ ...stuck, cells: planted().cells }).gifted).toBe(false);
   });
 });

@@ -10,19 +10,19 @@ export function createGrid(size: 6 | 8): Cell[] {
 }
 
 export function expandedCells(cells: Cell[]): Cell[] {
-  return [
-    ...cells,
-    ...createGrid(8).filter(cell => cell.x >= 6 || cell.y >= 6)
-  ];
+  return [...cells, ...createGrid(8).filter(cell => cell.x >= 6 || cell.y >= 6)];
 }
 
 export function newGame(now: number): GameState {
   return {
-    version: 1,
+    version: 2,
     createdAt: now,
     savedAt: now,
     gridSize: 6,
     gold: START_GOLD,
+    xp: 0,
+    eggs: 0,
+    coop: { owned: false, chickens: [], pendingEggs: 0 },
     seeds: { ...emptyInventory(), wheat: START_WHEAT_SEEDS },
     produce: emptyInventory(),
     cells: createGrid(6),
