@@ -15,7 +15,7 @@ export function FieldList() {
       <div className="accessible-field" style={{ gridTemplateColumns: `repeat(${game.gridSize}, minmax(0, 1fr))` }}>
         {game.cells.map(item => (
           <button key={item.id} aria-label={cellLabel(item, now)} aria-pressed={item.id === selected} onClick={() => useGame.setState({ selected: item.id })}>
-            <span aria-hidden="true">{item.kind === 'planted' ? CROPS[item.cropId].icon : item.kind === 'tilled' ? '▤' : '·'}{isRipe(item, now) ? '✦' : ''}</span>
+            <span aria-hidden="true">{item.kind === 'tree' ? (item.treeId === 'apple' ? '🍎' : '🍒') : item.kind === 'planted' ? CROPS[item.cropId].icon : item.kind === 'tilled' ? '▤' : '·'}{isRipe(item, now) || item.kind === 'tree' && now >= item.ripeAt ? '✦' : ''}</span>
           </button>
         ))}
       </div>

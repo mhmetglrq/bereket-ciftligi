@@ -227,7 +227,7 @@ describe('Offline Progress', () => {
     const result = advanceOffline(game, NOW + 60_000);
     expect(result.summary).toEqual({
       elapsedMs: 60_000, appliedMs: 60_000, capped: false,
-      ripened: { ...emptyInventory(), wheat: 1, carrot: 1 }, eggs: 0, hungry: 0
+      ripened: { ...emptyInventory(), wheat: 1, carrot: 1 }, eggs: 0, hungry: 0, production: {}, trees: {}
     });
     expect(isRipe(result.state.cells[0], NOW + 60_000)).toBe(true);
     expect(isRipe(result.state.cells[1], NOW + 60_000)).toBe(true);

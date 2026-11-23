@@ -12,6 +12,8 @@ import { Ground } from './Ground';
 import { Selection } from './Selection';
 import { Tiles } from './Tiles';
 import { tr } from '../i18n/tr';
+import { Buildings } from './Buildings';
+import { Trees } from './Trees';
 
 declare global {
   interface Window {
@@ -48,6 +50,8 @@ function World() {
       <WaterMarks />
       <Crops assets={assets} />
       <Coop />
+      <Buildings assets={assets} />
+      <Trees assets={assets} />
       <Selection />
       <Decor />
     </>

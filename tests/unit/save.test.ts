@@ -23,7 +23,7 @@ describe('Save System: Serialization & Schema', () => {
   it('migrates valid schema fixtures and detects future or corrupt versions', () => {
     const validFixture = newGame(NOW);
     expect(migrate(validFixture)).toEqual({ kind: 'ok', state: validFixture });
-    expect(migrate({ version: 3, gold: 100 })).toEqual({ kind: 'future' });
+    expect(migrate({ version: 4, gold: 100 })).toEqual({ kind: 'future' });
     expect(migrate({ version: 99 })).toEqual({ kind: 'future' });
     expect(migrate({ version: 0 })).toEqual({ kind: 'corrupt' });
     expect(migrate({ version: -1 })).toEqual({ kind: 'corrupt' });

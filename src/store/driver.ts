@@ -3,6 +3,9 @@ import { isRipe } from '../sim/crops';
 import { advanceOffline } from '../sim/offline';
 import { settleCoop } from '../sim/coop';
 import { useGame } from './game';
+import { advance } from '../sim/production';
+import { refill } from '../sim/orders';
+import { rollDailyQuests } from '../sim/daily';
 
 export function startDriver(): () => void {
   let raf = 0;
@@ -17,7 +20,7 @@ export function startDriver(): () => void {
       const baseline = Math.max(lastWall, current.game.savedAt);
       const game = now < baseline
         ? advanceOffline({ ...current.game, savedAt: baseline }, now).state
-        : settleCoop(current.game, now);
+        : rollDailyQuests(refill(advance(settleCoop(current.game, now), now), now), now);
       lastWall = now;
       useGame.setState({
         now,

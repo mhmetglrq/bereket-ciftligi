@@ -5,7 +5,7 @@ import { emptyInventory, QUESTS } from '../../src/sim/data';
 import type { LegacyGameState } from '../../src/save/schema';
 import type { GameState } from '../../src/sim/types';
 
-describe('Migration v1 -> v2', () => {
+describe('Migration v1 -> v3', () => {
   const now = 1_700_000_000_000;
 
   const validLegacyCells: LegacyGameState['cells'] = Array.from({ length: 36 }, (_, i) => ({
@@ -52,7 +52,7 @@ describe('Migration v1 -> v2', () => {
 
     // Checks v2 schema validity
     expect(isGameState(state)).toBe(true);
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(3);
 
     // Retains player progress
     expect(state.gold).toBe(150);
@@ -111,7 +111,7 @@ describe('Migration v1 -> v2', () => {
   });
 
   it('rejects future versions with kind future', () => {
-    const futureSave = { ...legacyFixture, version: 3 };
+    const futureSave = { ...legacyFixture, version: 4 };
     const result = migrate(futureSave);
     expect(result.kind).toBe('future');
   });

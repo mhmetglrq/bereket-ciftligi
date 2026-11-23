@@ -302,3 +302,88 @@ progress { width: 100%; height: 9px; display: block; accent-color: #588044; }
   .welcome-note { display: none; }
   .toolbar-wrap { left: auto; right: 20px; transform: none; }
 }
+
+/* Shared ledger colours for the HUD and its panels. */
+:root {
+  --c-primary: #9e1b2c;
+  --c-primary-hover: #b8243a;
+  --c-gold: #d9a63e;
+  --c-surface: #1b2238;
+  --c-raised: #252e4a;
+  --c-text: #f3e9d2;
+  --c-muted: #a9b0c6;
+  --c-error: #e5484d;
+  --c-success: #5fb36a;
+  --c-danger: #b3261e;
+  --ink: var(--c-text);
+  --muted: var(--c-muted);
+  --paper: var(--c-surface);
+  --line: #4a3a1e;
+  --green: var(--c-primary);
+  --green-hover: var(--c-primary-hover);
+  --gold: var(--c-gold);
+  --gold-soft: #3b2e12;
+  --xp-track: var(--gold-soft);
+  --warn: var(--c-error);
+  --shadow: 0 8px 24px rgba(0, 0, 0, .45);
+  color: var(--c-text);
+}
+.panel { background: var(--c-surface); color: var(--c-text); border: 2px solid var(--line); box-shadow: var(--shadow); }
+button { color: var(--c-text); background: var(--c-raised); border-color: var(--line); }
+button:hover:not(:disabled) { background: var(--gold-soft); }
+button.primary { background: var(--c-primary); color: #fff4e0; }
+button.primary:hover:not(:disabled) { background: var(--c-primary-hover); }
+button:disabled { opacity: 1; color: var(--c-muted); background: var(--c-raised); }
+:focus-visible { outline: 2px solid var(--c-gold); outline-offset: 2px; }
+.modal { border-radius: 16px; }
+.modal-header { padding-bottom: 12px; border-bottom: 1px solid var(--c-gold); }
+.modal-header h2 { font-family: Alegreya, Georgia, serif; font-size: 22px; }
+.modal-backdrop { position: fixed; background: rgba(15, 20, 36, .72); backdrop-filter: none; }
+.modal-backdrop .modal-backdrop { position: fixed; z-index: 30; }
+.crop-card, .quest-card, .quest-card.complete, .expansion-card, .empty, .chicken-slot, .field-selected, .away-counts > div, .away-art, .success-message { background: var(--c-raised); color: var(--c-text); }
+.expansion-card p, .expansion-card > small, .title-card h2, .eyebrow { color: var(--c-muted); }
+.badge, .level-disc { background: var(--c-gold); color: #1a1408; }
+.gold > span:first-child, .quest-icon { color: var(--c-gold); }
+.feature-content, .feature-card { display: grid; gap: 12px; }
+.recipe-grid, .order-grid, .queue-grid { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.feature-card { padding: 12px; border-radius: 10px; background: var(--c-raised); border: 1px solid var(--line); align-content: start; min-width: 0; overflow-wrap: anywhere; }
+.feature-card h3 { font-size: 18px; }
+.queue-slot { min-height: 125px; border-style: dashed; }
+.ready-output { border-left: 3px solid var(--c-success); }
+.reward-line { color: var(--c-gold); }
+.shortage, .danger-text { color: var(--c-error); }
+button.destructive { background: var(--c-danger); color: white; }
+.confirm-actions { margin-top: 20px; }
+.daily-calendar { display: grid; gap: 8px; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.daily-calendar .feature-card { padding: 10px; font-size: 13px; }
+.daily-calendar .today { border: 2px solid var(--c-gold); }
+.daily-calendar .claimed { opacity: .65; }
+.daily-calendar .feature-card:last-child { background: #3a1018; }
+.feature-card progress { accent-color: var(--c-gold); }
+.building-sign { font-size: 12px; }
+.toasts {
+  position: fixed;
+  top: max(calc(var(--hud-bottom, 130px) + 8px), calc(env(safe-area-inset-top) + 8px));
+  right: max(8px, env(safe-area-inset-right));
+  width: min(320px, calc(25vw - max(8px, env(safe-area-inset-right))));
+  max-height: calc(100dvh - var(--hud-bottom, 130px) - 24px - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  gap: 8px;
+  pointer-events: none;
+}
+.toasts .toast { pointer-events: auto; min-height: 44px; text-align: left; padding: 12px; font-size: 14px; font-weight: 500; background: var(--c-surface); color: var(--c-text); border-left: 4px solid var(--c-gold); animation: toast-in 200ms ease-out; }
+.toasts .level-toast { border-left-color: var(--c-primary); }
+.toasts .level-toast > strong { font-size: 20px; }
+@keyframes toast-in { from { opacity: 0; translate: 20px 0; } to { opacity: 1; translate: 0 0; } }
+@media (max-width: 700px) {
+  .recipe-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .order-grid { grid-template-columns: 1fr; }
+  .daily-calendar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .queue-grid { gap: 6px; }
+  .queue-slot { padding: 8px; font-size: 12px; }
+  .toasts .toast { font-size: 12px; padding: 8px 5px; }
+  .toasts .level-toast > strong { font-size: 14px; }
+  .nav { max-width: calc(100vw - 24px); }
+  .nav button { padding: 8px; min-width: 44px; }
+  .world-status { top: 132px; }
+}

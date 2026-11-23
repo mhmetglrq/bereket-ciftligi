@@ -1,5 +1,5 @@
-import { emptyInventory, QUESTS } from '../sim/data';
-import { isGameState, isLegacyGameState, versionOf } from './schema';
+import { emptyInventory, QUESTS, featureDefaults } from '../sim/data';
+import { isGameState, isLegacyGameState, isV2GameState, versionOf, type V2GameState } from './schema';
 import type { GameState } from '../sim/types';
 
 export type DecodeResult =
@@ -9,10 +9,10 @@ export type DecodeResult =
 
 export function migrate(value: unknown): DecodeResult {
   const version = versionOf(value);
-  if (version !== null && version > 2) return { kind: 'future' };
+  if (version !== null && version > 3) return { kind: 'future' };
   if (version === 1) {
     if (!isLegacyGameState(value)) return { kind: 'corrupt' };
-    const candidate: GameState = {
+    const candidate: V2GameState = {
       ...value,
       version: 2,
       xp: 0,
@@ -27,6 +27,11 @@ export function migrate(value: unknown): DecodeResult {
         ...value.quests
       }
     };
+    return isV2GameState(candidate) ? migrate(candidate) : { kind: 'corrupt' };
+  }
+  if (version === 2) {
+    if (!isV2GameState(value)) return { kind: 'corrupt' };
+    const candidate: GameState = { ...value, ...featureDefaults(), version: 3 };
     return isGameState(candidate) ? { kind: 'ok', state: candidate } : { kind: 'corrupt' };
   }
   return isGameState(value) ? { kind: 'ok', state: value } : { kind: 'corrupt' };

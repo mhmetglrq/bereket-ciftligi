@@ -9,16 +9,33 @@ import { tr } from '../../i18n/tr';
 import { number } from '../../i18n/format';
 import { playSound, unlockAudio, type Sound } from '../../audio/sfx';
 import type { Store } from '../game';
-import { feedback, WARNING_ID } from './uiSlice';
+import { applyBatch } from '../../sim/batch';
 
 export interface GameSlice {
   game: GameState;
   dispatch: (action: Action) => void;
   selectCell: (id: string) => void;
+  paintCells: (ids: string[]) => boolean;
 }
 
 export const createGameSlice: StateCreator<Store, [], [], GameSlice> = (set, get) => ({
   game: newGame(Date.now()),
+  paintCells: ids => {
+    const current = get();
+    if (!current.tool || current.panel || current.away || current.phase !== 'playing' || !current.mayWrite()) return false;
+    const now = Date.now();
+    const result = applyBatch(current.game, current.tool, ids, now, current.seed);
+    const changedCell = result.state.cells.filter((cell, index) => cell !== current.game.cells[index]).at(-1);
+    set({ game: result.state, now, selected: changedCell?.id ?? current.selected, paintedCell: changedCell?.id ?? current.paintedCell, saveStatus: 'saving', ripeIds: result.state.cells.filter(cell => isRipe(cell, now)).map(cell => cell.id) });
+    if (result.events.length) {
+      unlockAudio();
+      if (current.tool !== 'water') playSound(current.tool === 'harvest' ? 'harvest' : current.tool === 'plant' ? 'plant' : 'till', current.reducedMotion);
+    }
+    if (result.events.length) current.requestSave();
+    if (levelOf(result.state.xp) > levelOf(current.game.xp)) current.notify(`${tr.level} ${number(levelOf(result.state.xp))}!`);
+    if (result.stoppedReason) current.notify(tr.reasons[result.stoppedReason]);
+    return !result.stoppedReason;
+  },
   dispatch: action => {
     const current = get();
     unlockAudio();
@@ -29,13 +46,23 @@ export const createGameSlice: StateCreator<Store, [], [], GameSlice> = (set, get
     const now = Date.now();
     const result = applyAction(current.game, action, now);
     if (!result.ok) {
-      if (current.warn(now)) playSound('error', current.reducedMotion);
+      current.notify(tr.reasons[result.reason]);
+      playSound('error', current.reducedMotion);
       return;
     }
 
     let text: string = tr.plowed;
     let sound: Sound | null = 'till';
     switch (action.type) {
+      case 'buyBuilding': case 'plantTree': text = tr.purchaseDone; sound = 'coin'; break;
+      case 'queueProduction': text = tr.queued; sound = null; break;
+      case 'cancelProduction': text = tr.jobCancelled; sound = null; break;
+      case 'removeTree': text = tr.treeRemoved; sound = null; break;
+      case 'collectProduction': text = tr.collected; sound = 'harvest'; break;
+      case 'rejectOrder': text = tr.orderRejected; sound = null; break;
+      case 'deliverOrder': case 'sellItem':
+        text = `${tr.add}${number(result.state.gold - current.game.gold)} ${tr.gold}`; sound = 'coin'; break;
+      case 'claimDaily': case 'claimDailyQuest': text = tr.rewardReceived; sound = 'coin'; break;
       case 'plant': text = tr.planted; sound = 'plant'; break;
       case 'harvest': {
         const cropId = result.events[0]?.cropId;
@@ -67,21 +94,19 @@ export const createGameSlice: StateCreator<Store, [], [], GameSlice> = (set, get
         sound = 'coin';
         break;
     }
-    set(state => ({
+    set({
       game: result.state,
       now,
       ripeIds: result.state.cells.filter(cell => isRipe(cell, now)).map(cell => cell.id),
-      floaters: state.panel || state.away ? [] : [
-        ...state.floaters.filter(item => item.id !== WARNING_ID && item.expiresAt > now).slice(-4),
-        feedback(text, now, action.type === 'water' ? 900 : 3000)
-      ],
+      floaters: [],
       saveStatus: 'saving'
-    }));
+    });
+    get().notify(text);
     if (result.events.some(event => event.type === 'rescue')) get().notify(tr.gift);
     if (levelOf(result.state.xp) > levelOf(current.game.xp)) {
       get().notify(
         `${tr.level} ${number(levelOf(result.state.xp))}!`,
-        5000,
+        3000,
         unlocksBetween(current.game.xp, result.state.xp)
       );
     }

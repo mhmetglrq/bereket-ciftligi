@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, Plane, Raycaster, Vector2, Vector3 } from 'three';
-import { PointerGestures } from '../input/pointer';
+import { PointerGestures, interpolateCells, type Point } from '../input/pointer';
 import { useGame } from '../store/game';
+import { applyAction } from '../sim/actions';
+import type { Reason } from '../sim/types';
+import { tr } from '../i18n/tr';
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
@@ -19,7 +22,65 @@ export function CameraRig() {
     const raycaster = new Raycaster();
     const plane = new Plane(new Vector3(0, 1, 0), -0.09);
     const hit = new Vector3();
+    const ndc = new Vector2();
+    const visited = new Set<string>();
+    let lastCell: Point | null = null;
+    let pending: Point | null = null;
+    let stopped = false;
+    let frame = 0;
+    let initialReason: Reason | null = null;
+    const cellAt = (point: Point): Point | null => {
+      const rect = element.getBoundingClientRect();
+      ndc.set(((point.x - rect.left) / rect.width) * 2 - 1, -((point.y - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+      return { x: Math.floor(hit.x + 0.5), y: Math.floor(hit.z + 0.5) };
+    };
+    const flush = (): void => {
+      frame = 0;
+      const point = pending; pending = null;
+      if (!point || stopped) return;
+      const cell = cellAt(point);
+      if (!cell) return;
+      const size = useGame.getState().game.gridSize;
+      const ids = interpolateCells(lastCell ?? cell, cell).filter(id => {
+        const [x, y] = id.split(',').map(Number);
+        if (x < 0 || y < 0 || x >= size || y >= size || visited.has(id)) return false;
+        visited.add(id); return true;
+      });
+      lastCell = cell;
+      if (ids.length) stopped = !useGame.getState().paintCells(ids);
+    };
     const gestures = new PointerGestures({
+      paintStart: point => {
+        const state = useGame.getState();
+        if (!state.tool || state.phase !== 'playing' || state.panel || state.away || state.conflict) return false;
+        const cell = cellAt(point);
+        if (!cell || cell.x < 0 || cell.y < 0 || cell.x >= state.game.gridSize || cell.y >= state.game.gridSize) return false;
+        visited.clear(); lastCell = cell; stopped = false;
+        const cellId = `${cell.x},${cell.y}`;
+        const probe = applyAction(state.game, state.tool === 'plant' ? { type: 'plant', cellId, cropId: state.seed } : { type: state.tool, cellId }, state.now);
+        initialReason = probe.ok ? null : probe.reason;
+        useGame.setState({ painting: true, paintedCell: initialReason ? null : cellId, selected: cellId });
+        element.style.cursor = 'crosshair';
+        pending = point; frame = requestAnimationFrame(flush);
+        return true;
+      },
+      paint: point => { pending = point; if (!frame) frame = requestAnimationFrame(flush); },
+      paintEnd: (tap, cancelled) => {
+        if (frame) cancelAnimationFrame(frame);
+        if (cancelled) { pending = null; frame = 0; stopped = true; }
+        else {
+          flush();
+          if (tap && initialReason && initialReason !== 'noSeeds' && initialReason !== 'locked') useGame.getState().notify(tr.reasons[initialReason]);
+          if (tap && !initialReason && !stopped) {
+            const tool = useGame.getState().tool;
+            useGame.getState().notify(tool === 'till' ? tr.plowed : tool === 'plant' ? tr.planted : tool === 'water' ? tr.watered : tr.harvested);
+          }
+        }
+        useGame.setState({ painting: false });
+        element.style.cursor = '';
+      },
       tap: point => {
         const state = useGame.getState();
         if (state.phase !== 'playing' || state.panel || state.away || state.conflict) return;
@@ -68,6 +129,8 @@ export function CameraRig() {
     element.addEventListener('lostpointercapture', cancel);
     element.addEventListener('wheel', wheel, { passive: false });
     return () => {
+      if (frame) cancelAnimationFrame(frame);
+      useGame.setState({ painting: false });
       element.removeEventListener('pointerdown', down);
       element.removeEventListener('pointermove', move);
       element.removeEventListener('pointerup', up);
@@ -79,6 +142,7 @@ export function CameraRig() {
 
   useFrame((_, delta) => {
     const state = useGame.getState();
+    if (state.painting) return;
     const center = (state.game.gridSize - 1) / 2;
     target.current.x = clamp(target.current.x, center - 3.5, center + 3.5);
     target.current.z = clamp(target.current.z, center - 3.5, center + 3.5);

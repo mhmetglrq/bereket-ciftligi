@@ -1,5 +1,7 @@
-import { QUESTS, START_GOLD, START_WHEAT_SEEDS, emptyInventory } from './data';
+import { QUESTS, START_GOLD, START_WHEAT_SEEDS, emptyInventory, featureDefaults } from './data';
 import type { Cell, GameState } from './types';
+import { refill } from './orders';
+import { rollDailyQuests } from './daily';
 
 export function createGrid(size: 6 | 8): Cell[] {
   return Array.from({ length: size * size }, (_, index) => {
@@ -14,8 +16,9 @@ export function expandedCells(cells: Cell[]): Cell[] {
 }
 
 export function newGame(now: number): GameState {
-  return {
-    version: 2,
+  return rollDailyQuests(refill({
+    version: 3,
+    ...featureDefaults(),
     createdAt: now,
     savedAt: now,
     gridSize: 6,
@@ -29,5 +32,5 @@ export function newGame(now: number): GameState {
     quests: Object.fromEntries(
       QUESTS.map(quest => [quest.id, { count: 0, status: 'active' as const }])
     )
-  };
+  }, now), now);
 }

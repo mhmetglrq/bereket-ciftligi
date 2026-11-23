@@ -7,11 +7,11 @@ function setup() {
 }
 
 describe('pointer gestures', () => {
-  it('selects only a one-pointer tap strictly below 8px', () => {
+  it('selects only a one-pointer tap strictly below 6px', () => {
     const { callbacks, gestures } = setup();
     gestures.down(1, { x: 0, y: 0 });
-    gestures.move(1, { x: 7, y: 0 });
-    gestures.up(1, { x: 7, y: 0 });
+    gestures.move(1, { x: 5, y: 0 });
+    gestures.up(1, { x: 5, y: 0 });
     expect(callbacks.tap).toHaveBeenCalledOnce();
     expect(callbacks.pan).not.toHaveBeenCalled();
   });

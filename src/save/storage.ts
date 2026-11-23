@@ -2,6 +2,7 @@ import { get, set, del } from 'idb-keyval';
 import { newGame } from '../sim/grid';
 import type { GameState } from '../sim/types';
 import { deserialize, serialize } from './serialize';
+import { refill } from '../sim/orders';
 
 export const SAVE_KEY = 'bereket-ciftligi:save:v1';
 
@@ -25,6 +26,7 @@ export class SaveStorage {
   private index = 0;
   private selected = false;
   private legacyRaw: string | null = null;
+  private legacyVersion = 1;
   private protectedBackends = new Set<number>();
   private readonly modes: StorageMode[] = ['local', 'idb', 'memory'];
 
@@ -47,16 +49,18 @@ export class SaveStorage {
     return this.backends[this.index].get(key);
   }
 
-  async protectV1(raw: string): Promise<void> {
+  async protectLegacy(raw: string, version: 1 | 2): Promise<void> {
     this.legacyRaw = raw;
+    this.legacyVersion = version;
     await this.ensureBackup();
   }
 
   private async ensureBackup(): Promise<void> {
     if (this.legacyRaw === null || this.protectedBackends.has(this.index)) return;
     const backend = this.backends[this.index];
-    const key = `${SAVE_KEY}:backup:v1`;
+    const key = `${SAVE_KEY}:backup:pre-v3`;
     if (await backend.get(key) === null) await backend.set(key, this.legacyRaw);
+    if (this.legacyVersion === 1 && await backend.get(`${SAVE_KEY}:backup:v1`) === null) await backend.set(`${SAVE_KEY}:backup:v1`, this.legacyRaw);
     this.protectedBackends.add(this.index);
   }
 
@@ -77,6 +81,15 @@ export class SaveStorage {
 
   async remove(key = SAVE_KEY): Promise<void> {
     await this.backends[this.index].remove(key);
+  }
+
+  async finishMigration(): Promise<void> {
+    if (this.legacyRaw === null) return;
+    this.legacyRaw = null;
+    for (const index of this.protectedBackends) {
+      try { await this.backends[index].remove(`${SAVE_KEY}:backup:pre-v3`); } catch { /* A retained backup is safe. */ }
+    }
+    this.protectedBackends.clear();
   }
 }
 
@@ -109,14 +122,14 @@ export async function loadGame(storage: SaveStorage, now: number): Promise<LoadR
   if (decoded.kind === 'ok') {
     const original: unknown = JSON.parse(raw);
     if (typeof original === 'object' && original !== null &&
-      'version' in original && original.version === 1) {
+      'version' in original && (original.version === 1 || original.version === 2)) {
       try {
-        await storage.protectV1(raw);
+        await storage.protectLegacy(raw, original.version);
       } catch {
         return { state: decoded.state, notice: 'migrationBackupFailed', readonly: true };
       }
     }
-    return { state: decoded.state, notice: null, readonly: false };
+    return { state: refill(decoded.state, now), notice: null, readonly: false };
   }
   if (decoded.kind === 'future') {
     return { state: newGame(now), notice: 'future', readonly: true };
@@ -129,6 +142,7 @@ export async function loadGame(storage: SaveStorage, now: number): Promise<LoadR
   }
 }
 
-export function saveGame(storage: SaveStorage, state: GameState, now: number): Promise<void> {
-  return storage.write(serialize({ ...state, savedAt: now }));
+export async function saveGame(storage: SaveStorage, state: GameState, now: number): Promise<void> {
+  await storage.write(serialize({ ...state, savedAt: now }));
+  await storage.finishMigration();
 }

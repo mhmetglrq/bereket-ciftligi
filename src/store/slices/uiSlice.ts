@@ -5,7 +5,7 @@ import type { StorageMode } from '../../save/storage';
 import { tr } from '../../i18n/tr';
 import type { Store } from '../game';
 
-export type Panel = 'market' | 'quests' | 'settings' | 'pause' | 'field' | 'reset' | 'coop' | null;
+export type Panel = 'market' | 'quests' | 'settings' | 'pause' | 'field' | 'reset' | 'coop' | 'mill' | 'bakery' | 'orders' | 'daily' | null;
 export interface Feedback {
   id: number;
   text: string;
@@ -21,6 +21,8 @@ export interface UISlice {
   tool: Tool | null;
   seed: CropId;
   selected: string | null;
+  painting: boolean;
+  paintedCell: string | null;
   away: AwayReport | null;
   toasts: Feedback[];
   floaters: Feedback[];
@@ -52,6 +54,8 @@ export const createUISlice: StateCreator<Store, [], [], UISlice> = (set, get) =>
   tool: null,
   seed: 'wheat',
   selected: null,
+  painting: false,
+  paintedCell: null,
   away: null,
   toasts: [],
   floaters: [],
@@ -74,7 +78,7 @@ export const createUISlice: StateCreator<Store, [], [], UISlice> = (set, get) =>
     const now = Date.now();
     return {
       toasts: [
-        ...state.toasts.filter(item => item.expiresAt > now).slice(-2),
+        ...state.toasts.filter(item => item.expiresAt > now).slice(-3),
         {
           ...feedback(text, now, duration),
           ...(unlocks !== undefined ? { kind: 'level' as const, unlocks } : {})
