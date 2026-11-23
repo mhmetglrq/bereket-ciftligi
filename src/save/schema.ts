@@ -131,15 +131,20 @@ export function isV3GameState(value: unknown): value is V3GameState {
 
 export function isV2GameState(value: unknown): value is V2GameState { return validate(value, false); }
 
+export function isLayout(value: unknown): value is Layout {
+  if (!Array.isArray(value) || !value.every((o: unknown) => record(o) && typeof o.id === 'string' && finite(o.x) && finite(o.y) && Number.isInteger(o.x) && Number.isInteger(o.y) && natural(o.width) && o.width > 0 && natural(o.height) && o.height > 0)) return false;
+  const layout = value as Layout;
+  return new Set(layout.map(o => o.id)).size === layout.length &&
+    layout.every(o => canPlace(layout, o) && (!o.id.startsWith('plot-') || (o.width === 2 && o.height === 2)));
+}
+
 export function isGameState(value: unknown): value is GameState {
   if (!record(value) || value.version !== 4 || !natural(value.day) || value.day < 1 || value.day > 28 || !natural(value.year) || value.year < 1 || !['spring', 'summer', 'autumn', 'winter'].includes(String(value.season)) || !natural(value.minute) || value.minute < 360 || value.minute > 1560 || !natural(value.elapsedMinutes) || !natural(value.energy) || value.energy > 270 || !['sunny', 'rain'].includes(String(value.weather)) || typeof value.seenV4Intro !== 'boolean' || !record(value.shipping) || !Array.isArray(value.layout)) return false;
   if (!record(value.seeds) || !record(value.produce) || !CROP_IDS.every(id => natural((value.seeds as Record<string, unknown>)[id]) && natural((value.produce as Record<string, unknown>)[id]))) return false;
   if (!Object.entries(value.shipping).every(([id, qty]) => ITEM_IDS.includes(id as typeof ITEM_IDS[number]) && natural(qty))) return false;
-  if (!value.layout.every(o => record(o) && typeof o.id === 'string' && finite(o.x) && finite(o.y) && Number.isInteger(o.x) && Number.isInteger(o.y) && natural(o.width) && o.width > 0 && natural(o.height) && o.height > 0)) return false;
-  if (new Set(value.layout.map(o => (o as Record<string, unknown>).id)).size !== value.layout.length) return false;
-  const layout = value.layout as Layout;
-  if (!layout.every(o => canPlace(layout, o))) return false;
-  if (!defaultLayout().every(expected => layout.some(o => o.id === expected.id && o.width === expected.width && o.height === expected.height))) return false;
+  if (!isLayout(value.layout)) return false;
+  const layout = value.layout;
+  if (!defaultLayout().filter(expected => !expected.id.startsWith('plot-')).every(expected => layout.some(o => o.id === expected.id && o.width === expected.width && o.height === expected.height))) return false;
   if (!Array.isArray(value.cells) || !value.cells.every(c => record(c) && (!('daysRemaining' in c) || natural(c.daysRemaining)) && (!('ageDays' in c) || natural(c.ageDays)))) return false;
   if (!value.cells.every(c => record(c) && (c.wateredToday === undefined || typeof c.wateredToday === 'boolean') && (c.dead === undefined || typeof c.dead === 'boolean') && (c.fruitReady === undefined || typeof c.fruitReady === 'boolean') && (c.kind !== 'tree' || layout.some(o => o.id === `tree:${String(c.id)}` && o.width === 1 && o.height === 1)))) return false;
   // Reuse the complete legacy inventory/building/order validation with normalized day fields.

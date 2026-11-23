@@ -1,10 +1,10 @@
 import { emptyInventory, QUESTS, featureDefaults, CROPS, RECIPES } from '../sim/data';
-import { defaultLayout } from '../sim/layout';
+import { defaultLayout, ensurePlotsForCells } from '../sim/layout';
 import { canPlace } from '../sim/layout';
 import { rollDailyQuests } from '../sim/daily';
 import { refill } from '../sim/orders';
 import { morningWeather } from '../sim/weather';
-import { isGameState, isV3GameState, isLegacyGameState, isV2GameState, versionOf, type V2GameState, type V3GameState } from './schema';
+import { isGameState, isLayout, isV3GameState, isLegacyGameState, isV2GameState, versionOf, type V2GameState, type V3GameState } from './schema';
 import type { GameState } from '../sim/types';
 
 export type DecodeResult =
@@ -82,5 +82,16 @@ export function migrate(value: unknown): DecodeResult {
     if (state.daily.quests.length) state.daily = { ...state.daily, date: '1:0:1' };
     return { kind: 'ok', state: morningWeather(refill(state.daily.quests.length ? state : rollDailyQuests(state, 0), 0)) };
   }
-  return isGameState(value) ? { kind: 'ok', state: value } : { kind: 'corrupt' };
+  if (version === 4 && typeof value === 'object' && value !== null &&
+    'layout' in value && isLayout(value.layout) && 'cells' in value && Array.isArray(value.cells)) {
+    const cells = value.cells.flatMap((cell: unknown) => {
+      if (typeof cell !== 'object' || cell === null || !('x' in cell) || !('y' in cell) ||
+        typeof cell.x !== 'number' || typeof cell.y !== 'number' ||
+        !Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y)) return [];
+      return [{ x: cell.x, y: cell.y }];
+    });
+    const candidate = { ...value, layout: ensurePlotsForCells(value.layout, cells) };
+    return isGameState(candidate) ? { kind: 'ok', state: candidate } : { kind: 'corrupt' };
+  }
+  return { kind: 'corrupt' };
 }

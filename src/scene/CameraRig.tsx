@@ -6,7 +6,7 @@ import { useGame } from '../store/game';
 import { applyAction } from '../sim/actions';
 import type { Reason } from '../sim/types';
 import { tr } from '../i18n/tr';
-import { cellPosition } from '../sim/layout';
+import { cellPosition, plotIdForCell } from '../sim/layout';
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
@@ -123,7 +123,7 @@ export function CameraRig() {
         const p = cellAt(point(event));
         const cell = p && s.game.cells.find(c => c.x === p.x && c.y === p.y);
         if (cell) {
-          const id = cell.kind === 'tree' ? `tree:${cell.id}` : `plot-${Math.floor(cell.y / 2) * 4 + Math.floor(cell.x / 2)}`;
+          const id = cell.kind === 'tree' ? `tree:${cell.id}` : plotIdForCell(cell, s.game.layout);
           if (s.hoveredObject !== id) useGame.setState({ hoveredObject: id });
         } else if (s.hoveredObject?.startsWith('plot-') || s.hoveredObject?.startsWith('tree:')) useGame.setState({ hoveredObject: null });
       }

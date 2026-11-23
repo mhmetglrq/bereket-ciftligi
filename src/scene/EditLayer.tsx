@@ -1,10 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { Box3, Plane, Raycaster, Vector2, Vector3 } from 'three';
 import { useGame } from '../store/game';
 import { canPlace } from '../sim/layout';
 import type { LayoutObject } from '../sim/types';
+import { buildFrameGeometry } from './frameGeometry';
+
+function PlacementFrame({ width, height, valid }: { width: number; height: number; valid: boolean }) {
+  const geometry = useMemo(() => buildFrameGeometry(width, height), [width, height]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <lineSegments geometry={geometry}>
+    {valid ? <lineBasicMaterial color="#315c3d" /> : <lineDashedMaterial color="#8a332b" dashSize={0.15} gapSize={0.1} />}
+  </lineSegments>;
+}
+
 export function EditLayer() {
   const edit = useGame(s => s.editMode), layout = useGame(s => s.game.layout);
   const { camera, gl } = useThree();
@@ -21,7 +31,12 @@ export function EditLayer() {
       ray.setFromCamera(ndc, camera);
       return ray.ray.intersectPlane(plane, hit) ? { x: hit.x, y: hit.z } : null;
     };
-    const reset = () => { clearTimeout(timer); dragging = null; start = null; pointer = null; ghostRef.current = null; setGhost(null); useGame.setState({ isDragging: false }); };
+    const reset = () => {
+      clearTimeout(timer);
+      if (pointer !== null && canvas.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
+      dragging = null; start = null; pointer = null; ghostRef.current = null; setGhost(null);
+      useGame.setState({ isDragging: false });
+    };
     const down = (e: PointerEvent) => {
       if (pointer !== null || e.button !== 0) return;
       const p = point(e); if (!p) return;
@@ -69,15 +84,7 @@ export function EditLayer() {
   const valid = canPlace(layout, ghost);
   return <group position={[ghost.x + (ghost.width - 1) / 2, 0.15, ghost.y + (ghost.height - 1) / 2]}>
     <mesh rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[ghost.width, ghost.height]} /><meshBasicMaterial color={valid ? '#315c3d' : '#8a332b'} transparent opacity={0.55} depthWrite={false} /></mesh>
-    <lineSegments onUpdate={line => line.computeLineDistances()}>
-      <bufferGeometry><bufferAttribute attach="attributes-position" args={[new Float32Array([
-        -ghost.width / 2, 0.01, -ghost.height / 2, ghost.width / 2, 0.01, -ghost.height / 2,
-        ghost.width / 2, 0.01, -ghost.height / 2, ghost.width / 2, 0.01, ghost.height / 2,
-        ghost.width / 2, 0.01, ghost.height / 2, -ghost.width / 2, 0.01, ghost.height / 2,
-        -ghost.width / 2, 0.01, ghost.height / 2, -ghost.width / 2, 0.01, -ghost.height / 2
-      ]), 3]} /></bufferGeometry>
-      {valid ? <lineBasicMaterial color="#315c3d" /> : <lineDashedMaterial color="#8a332b" dashSize={0.15} gapSize={0.1} />}
-    </lineSegments>
+    <PlacementFrame width={ghost.width} height={ghost.height} valid={valid} />
     <Html center><span className={`edit-ghost ${valid ? 'valid' : 'invalid'}`}>{valid ? '✓' : '✕'}</span></Html>
   </group>;
 }

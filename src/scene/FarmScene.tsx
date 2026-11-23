@@ -16,6 +16,7 @@ import { Buildings } from './Buildings';
 import { Trees } from './Trees';
 import { stepDriver } from '../store/driver';
 import { EditLayer } from './EditLayer';
+import { EditLayerBoundary } from './EditLayerBoundary';
 import { SceneLabels } from './SceneLabels';
 
 declare global {
@@ -58,7 +59,7 @@ function World() {
       <Trees assets={assets} />
       <Selection />
       <Decor />
-      <EditLayer />
+      <EditLayerBoundary><EditLayer /></EditLayerBoundary>
       <SceneLabels />
     </>
   );

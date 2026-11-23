@@ -8,7 +8,7 @@ import { levelOf, unlocksBetween } from '../../sim/xp';
 import type { Action, GameState, ItemId } from '../../sim/types';
 import { endDay } from '../../sim/dayEnd';
 import { shipPut, shipTake } from '../../sim/shipping';
-import { moveObject } from '../../sim/layout';
+import { moveObject, plotIdForCell } from '../../sim/layout';
 import { claimDaily, localDateKey } from '../../sim/daily';
 import { overnightQueue } from './uiSlice';
 import { tr } from '../../i18n/tr';
@@ -148,7 +148,7 @@ export const createGameSlice: StateCreator<Store, [], [], GameSlice> = (set, get
   selectCell: id => {
     const state = get();
     const cell = state.game.cells.find(c => c.id === id);
-    set({ selected: id, selectedObject: cell ? cell.kind === 'tree' ? `tree:${id}` : `plot-${Math.floor(cell.y / 2) * 4 + Math.floor(cell.x / 2)}` : null });
+    set({ selected: id, selectedObject: cell ? cell.kind === 'tree' ? `tree:${id}` : plotIdForCell(cell, state.game.layout) : null });
     if (!state.tool || state.editMode || state.modalQueue.length || state.panel || state.phase !== 'playing') return;
     state.dispatch(state.tool === 'plant'
       ? { type: 'plant', cellId: id, cropId: state.seed }
